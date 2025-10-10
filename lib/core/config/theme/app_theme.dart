@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'color_scheme.dart';
-import './app_button_theme.dart';
+import 'package:flutter/services.dart';
+import '../color/color_scheme.dart';
+import 'app_button_theme.dart';
 import 'app_tab_theme.dart';
 
 class AppTheme {
@@ -9,6 +10,14 @@ class AppTheme {
   static final ThemeData darkTheme = _buildTheme(AppColorSchemes.dark);
 
   static ThemeData _buildTheme(ColorScheme cs, {String? fontFamily}) {
+    Color appBarBg(ColorScheme cs) {
+      // “Đục đục” nhẹ: khác nhau giữa light & dark
+      final base = cs.brightness == Brightness.dark
+          ? cs.surfaceContainerLow.withValues(alpha: 0.90)
+          : cs.surfaceContainerLow.withValues(alpha: 0.96);
+      return base;
+    }
+
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs,
@@ -29,15 +38,22 @@ class AppTheme {
       scaffoldBackgroundColor: cs.surface,
       // === AppBar ===
       appBarTheme: AppBarTheme(
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
+        backgroundColor: appBarBg(cs), // nền “đục” theo mode
+        surfaceTintColor: Colors.transparent, // không ám tint
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
+        shadowColor: Colors.transparent,
+        iconTheme: IconThemeData(color: cs.onSurface),
         titleTextStyle: TextStyle(
           color: cs.onSurface,
           fontWeight: FontWeight.w600,
           fontSize: 18,
         ),
+        // đảm bảo icon status bar đúng màu theo mode
+        systemOverlayStyle: cs.brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       // === Card ===
       cardTheme: CardThemeData(
@@ -95,25 +111,24 @@ class AppTheme {
 
       // === NavigationBar (Material3) ===
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: cs.surface,
-        indicatorColor: cs.primaryContainer,
+        backgroundColor: cs.surface, // đồng bộ surface
+        elevation: 0,
+        indicatorColor: Colors.transparent, // theo mockup: không pill
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
-          final color = states.contains(WidgetState.selected)
-              ? cs.onPrimaryContainer
-              : cs.onSurfaceVariant;
-          return IconThemeData(color: color);
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(color: selected ? cs.primary : cs.outline);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final color = states.contains(WidgetState.selected)
-              ? cs.onSurface
-              : cs.onSurfaceVariant;
-          return TextStyle(fontWeight: FontWeight.w600, color: color);
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? cs.primary : cs.outline,
+          );
         }),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        height: 64,
       ),
-
+      dividerColor: cs.outlineVariant, // dùng thống nhất cho viền
       // === Chip ===
       chipTheme: ChipThemeData(
         backgroundColor: cs.surfaceContainerHighest,

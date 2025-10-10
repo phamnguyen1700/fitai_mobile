@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/core/utils/validation.dart';
 import 'package:flutter/material.dart';
 import 'package:fitai_mobile/core/widgets/widgets.dart'; // AppButton, AppTextField, ...
 import 'package:form_field_validator/form_field_validator.dart';
@@ -119,10 +120,7 @@ class _LoginFormState extends State<_LoginForm> {
             label: 'Email',
             prefixIcon: Icons.email_outlined,
             hintText: 'Nhập email',
-            validator: MultiValidator([
-              RequiredValidator(errorText: 'Vui lòng nhập Email'),
-              EmailValidator(errorText: 'Email không hợp lệ'),
-            ]).call,
+            validator: V.email(),
           ),
           const SizedBox(height: 12),
 
@@ -133,9 +131,7 @@ class _LoginFormState extends State<_LoginForm> {
             prefixIcon: Icons.lock_outline,
             hintText: 'Nhập mật khẩu',
             obscure: true,
-            validator: RequiredValidator(
-              errorText: 'Vui lòng nhập mật khẩu',
-            ).call,
+            validator: V.password(),
           ),
 
           const SizedBox(height: 8),
@@ -227,10 +223,7 @@ class _RegisterFormState extends State<_RegisterForm> {
             label: 'Email',
             prefixIcon: Icons.email_outlined,
             hintText: 'Nhập email',
-            validator: MultiValidator([
-              RequiredValidator(errorText: 'Vui lòng nhập Email'),
-              EmailValidator(errorText: 'Email không hợp lệ'),
-            ]).call,
+            validator: V.email(),
           ),
           const SizedBox(height: 12),
 
@@ -240,9 +233,7 @@ class _RegisterFormState extends State<_RegisterForm> {
             prefixIcon: Icons.lock_outline,
             hintText: 'Nhập mật khẩu',
             obscure: true,
-            validator: RequiredValidator(
-              errorText: 'Vui lòng nhập mật khẩu',
-            ).call,
+            validator: V.password(),
           ),
           Text(
             '6 ký tự trở lên bao gồm chữ cái, số và ký tự đặc biệt.',
@@ -256,9 +247,7 @@ class _RegisterFormState extends State<_RegisterForm> {
             prefixIcon: Icons.lock_outline,
             hintText: 'Nhập lại mật khẩu',
             obscure: true,
-            validator: RequiredValidator(
-              errorText: 'Vui lòng nhập lại mật khẩu',
-            ).call,
+            validator: V.confirm(_passCtl),
           ),
           const SizedBox(height: 16),
 
