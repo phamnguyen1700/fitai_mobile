@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fitai_mobile/core/widgets/widgets.dart'; // AppButton, AppTextField, ...
+import 'package:form_field_validator/form_field_validator.dart';
 
 class AuthBottomSheet {
   static void show(BuildContext context) {
@@ -33,8 +34,6 @@ class _AuthSheetContentState extends State<_AuthSheetContent>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
@@ -67,116 +66,210 @@ class _AuthSheetContentState extends State<_AuthSheetContent>
 }
 
 // === FORM ĐĂNG NHẬP ===
-class _LoginForm extends StatelessWidget {
+class _LoginForm extends StatefulWidget {
   const _LoginForm();
+
+  @override
+  State<_LoginForm> createState() => _LoginFormState();
+}
+
+class _LoginFormState extends State<_LoginForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtl = TextEditingController();
+  final _passCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailCtl.dispose();
+    _passCtl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      // TODO: call API
+      debugPrint('LOGIN email=${_emailCtl.text} pass=${_passCtl.text}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Validate OK — tiến hành đăng nhập')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Text(
-            'Đăng nhập',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // Email
-        const AppTextField(
-          label: 'Email',
-          prefixIcon: Icons.email_outlined,
-          hintText: 'Nhập email',
-        ),
-        const SizedBox(height: 12),
-
-        // Mật khẩu
-        const AppTextField(
-          label: 'Mật khẩu',
-          prefixIcon: Icons.lock_outline,
-          hintText: 'Nhập mật khẩu',
-          obscure: true,
-        ),
-        const SizedBox(height: 8),
-
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Checkbox(value: false, onChanged: (_) {}),
-                Text(
-                  'Ghi nhớ đăng nhập',
-                  style: TextStyle(color: cs.onSurfaceVariant),
-                ),
-              ],
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUnfocus,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Text(
+              'Đăng nhập',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            TextButton(onPressed: () {}, child: const Text('Quên mật khẩu')),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
 
-        const SizedBox(height: 16),
+          // Email
+          AppTextField(
+            controller: _emailCtl,
 
-        AppButton(
-          label: 'Đăng nhập',
-          variant: AppButtonVariant.filled,
-          fullWidth: true,
-          onPressed: () {},
-        ),
-      ],
+            label: 'Email',
+            prefixIcon: Icons.email_outlined,
+            hintText: 'Nhập email',
+            validator: MultiValidator([
+              RequiredValidator(errorText: 'Vui lòng nhập Email'),
+              EmailValidator(errorText: 'Email không hợp lệ'),
+            ]).call,
+          ),
+          const SizedBox(height: 12),
+
+          // Mật khẩu
+          AppTextField(
+            controller: _passCtl,
+            label: 'Mật khẩu',
+            prefixIcon: Icons.lock_outline,
+            hintText: 'Nhập mật khẩu',
+            obscure: true,
+            validator: RequiredValidator(
+              errorText: 'Vui lòng nhập mật khẩu',
+            ).call,
+          ),
+
+          const SizedBox(height: 8),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Checkbox(value: false, onChanged: (_) {}),
+                  Text(
+                    'Ghi nhớ đăng nhập',
+                    style: TextStyle(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              TextButton(onPressed: () {}, child: const Text('Quên mật khẩu')),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          AppButton(
+            label: 'Đăng nhập',
+            variant: AppButtonVariant.filled,
+            fullWidth: true,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     );
   }
 }
 
 // === FORM ĐĂNG KÝ ===
-class _RegisterForm extends StatelessWidget {
+class _RegisterForm extends StatefulWidget {
   const _RegisterForm();
 
   @override
+  State<_RegisterForm> createState() => _RegisterFormState();
+}
+
+class _RegisterFormState extends State<_RegisterForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtl = TextEditingController();
+  final _passCtl = TextEditingController();
+  final _confirmCtl = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailCtl.dispose();
+    _passCtl.dispose();
+    _confirmCtl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      // TODO: call API
+      debugPrint(
+        'REGISTER email=${_emailCtl.text} pass=${_passCtl.text} confirm=${_confirmCtl.text}',
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Validate OK — tiến hành đăng ký')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Text(
-            'Đăng ký',
-            style: Theme.of(context).textTheme.titleMedium,
+    final cs = Theme.of(context).colorScheme;
+
+    return Form(
+      key: _formKey,
+      autovalidateMode: AutovalidateMode.onUnfocus,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Text(
+              'Đăng ký',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-        const AppTextField(
-          label: 'Email',
-          prefixIcon: Icons.email_outlined,
-          hintText: 'Nhập email',
-        ),
-        const SizedBox(height: 12),
+          AppTextField(
+            controller: _emailCtl,
+            label: 'Email',
+            prefixIcon: Icons.email_outlined,
+            hintText: 'Nhập email',
+            validator: MultiValidator([
+              RequiredValidator(errorText: 'Vui lòng nhập Email'),
+              EmailValidator(errorText: 'Email không hợp lệ'),
+            ]).call,
+          ),
+          const SizedBox(height: 12),
 
-        const AppTextField(
-          label: 'Mật khẩu',
-          prefixIcon: Icons.lock_outline,
-          hintText: 'Nhập mật khẩu',
-          obscure: true,
-        ),
-        const SizedBox(height: 12),
+          AppTextField(
+            controller: _passCtl,
+            label: 'Mật khẩu',
+            prefixIcon: Icons.lock_outline,
+            hintText: 'Nhập mật khẩu',
+            obscure: true,
+            validator: RequiredValidator(
+              errorText: 'Vui lòng nhập mật khẩu',
+            ).call,
+          ),
+          Text(
+            '6 ký tự trở lên bao gồm chữ cái, số và ký tự đặc biệt.',
+            style: TextStyle(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
 
-        const AppTextField(
-          label: 'Nhập lại mật khẩu',
-          prefixIcon: Icons.lock_outline,
-          hintText: 'Nhập lại mật khẩu',
-          obscure: true,
-        ),
-        const SizedBox(height: 16),
+          AppTextField(
+            controller: _confirmCtl,
+            label: 'Nhập lại mật khẩu',
+            prefixIcon: Icons.lock_outline,
+            hintText: 'Nhập lại mật khẩu',
+            obscure: true,
+            validator: RequiredValidator(
+              errorText: 'Vui lòng nhập lại mật khẩu',
+            ).call,
+          ),
+          const SizedBox(height: 16),
 
-        AppButton(
-          label: 'Đăng ký',
-          variant: AppButtonVariant.filled,
-          fullWidth: true,
-          onPressed: () {},
-        ),
-      ],
+          AppButton(
+            label: 'Đăng ký',
+            variant: AppButtonVariant.filled,
+            fullWidth: true,
+            onPressed: _submit,
+          ),
+        ],
+      ),
     );
   }
 }
