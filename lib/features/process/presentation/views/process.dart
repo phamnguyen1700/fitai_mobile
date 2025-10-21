@@ -5,14 +5,13 @@ class ProcessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Process'), centerTitle: true),
-      body: const Center(
-        child: Text(
+    return const Column(
+      children: [
+        Text(
           'Process',
           style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
         ),
-      ),
+      ],
     );
   }
 }

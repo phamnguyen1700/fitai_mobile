@@ -10,3 +10,4 @@ export 'app_chart_container.dart';
 export 'app_avatar.dart';
 export 'app_icon_button.dart';
 export 'app_bottom_sheet.dart';
+export 'app_icons.dart';

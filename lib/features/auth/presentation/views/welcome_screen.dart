@@ -1,12 +1,14 @@
 import 'package:fitai_mobile/features/auth/presentation/widgets/auth_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:fitai_mobile/core/widgets/widgets.dart';
+import 'package:go_router/go_router.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   void _onGetStarted(BuildContext context) {
-    showAppSnack(context, 'Bắt đầu ngay', AppSnackType.info);
+    // 👉 Điều hướng đến tab chính /home bằng GoRouter
+    context.go('/home');
   }
 
   void _onLogin(BuildContext context) {

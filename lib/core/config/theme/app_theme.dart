@@ -10,21 +10,27 @@ class AppTheme {
   static final ThemeData darkTheme = _buildTheme(AppColorSchemes.dark);
 
   static ThemeData _buildTheme(ColorScheme cs, {String? fontFamily}) {
-    Color appBarBg(ColorScheme cs) {
-      // “Đục đục” nhẹ: khác nhau giữa light & dark
-      final base = cs.brightness == Brightness.dark
-          ? cs.surfaceContainerLow.withValues(alpha: 0.90)
-          : cs.surfaceContainerLow.withValues(alpha: 0.96);
-      return base;
-    }
+    Color scaffoldBg(ColorScheme cs) => cs.brightness == Brightness.dark
+        ? const Color.fromARGB(255, 36, 36, 36) // DARK FIXED
+        : const Color.fromARGB(255, 228, 228, 228); // LIGHT FIXED
+
+    Color appBarBg(ColorScheme cs) => cs.brightness == Brightness.dark
+        ? Colors
+              .black // hơi sáng hơn body 1 nấc
+        : Colors.white; // trắng mỏng cho light
+
+    Color barBg(ColorScheme cs) => cs.brightness == Brightness.dark
+        ? Colors
+              .black // = AppBar dark
+        : Colors.white; // = AppBar light
 
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs,
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: cs.surface,
-        surfaceTintColor: cs.surfaceTint,
-        modalBackgroundColor: cs.surface,
+        backgroundColor: barBg(cs),
+        modalBackgroundColor: barBg(cs),
+        surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         elevation: 1,
         modalElevation: 2,
@@ -35,7 +41,7 @@ class AppTheme {
       ),
       fontFamily: fontFamily,
       visualDensity: VisualDensity.standard,
-      scaffoldBackgroundColor: cs.surface,
+      scaffoldBackgroundColor: scaffoldBg(cs),
       // === AppBar ===
       appBarTheme: AppBarTheme(
         backgroundColor: appBarBg(cs), // nền “đục” theo mode
@@ -100,7 +106,7 @@ class AppTheme {
 
       // === Bottom Navigation (Material2) ===
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: cs.surface,
+        backgroundColor: barBg(cs),
         selectedItemColor: cs.primary,
         unselectedItemColor: cs.onSurfaceVariant,
         type: BottomNavigationBarType.fixed,
@@ -111,7 +117,7 @@ class AppTheme {
 
       // === NavigationBar (Material3) ===
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: cs.surface, // đồng bộ surface
+        backgroundColor: barBg(cs), // đồng bộ surface
         elevation: 0,
         indicatorColor: Colors.transparent, // theo mockup: không pill
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

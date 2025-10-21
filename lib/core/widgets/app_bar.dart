@@ -30,47 +30,39 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize =>
       Size.fromHeight(height + (showBottomDivider ? 1 : 0));
 
-  bool _isSetup(String loc) {
-    const setupPrefixes = [
-      '/welcome',
-      '/setup',
-      '/profile-setup',
-      '/payment',
-      '/payment-processing',
-      '/terms',
-      '/privacy',
-    ];
-    return setupPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
+  String _currentLocation(BuildContext context) {
+    // ✅ dùng uri thay vì location (không deprecated, hoạt động trong ShellRoute)
+    final info = GoRouter.of(context).routeInformationProvider.value;
+    return info.uri.toString();
   }
 
   @override
   Widget build(BuildContext context) {
-    final canPop = Navigator.of(context).canPop();
-    final cs = Theme.of(context).colorScheme;
-    final dividerColor = Theme.of(context).dividerColor;
-    final loc = GoRouterState.of(context).uri.toString();
+    final theme = Theme.of(context);
 
-    final isSetup = style == AppBarStyle.auto
-        ? _isSetup(loc)
-        : style == AppBarStyle.surface;
-    final bg =
-        backgroundColor ??
-        (isSetup
-            ? Theme.of(context).appBarTheme.backgroundColor ?? cs.surface
-            : Theme.of(context).appBarTheme.backgroundColor ?? cs.surface);
+    final canPop = Navigator.of(context).canPop();
+
+    final bg = backgroundColor;
+
+    final bottomDivider = showBottomDivider
+        ? const PreferredSize(
+            preferredSize: Size.fromHeight(1),
+            child: Divider(height: 1, thickness: 1),
+          )
+        : null;
 
     return AppBar(
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
+      backgroundColor: bg,
       centerTitle: true,
       titleSpacing: 0,
-      backgroundColor: bg,
       title: Text(
         title,
-        style: Theme.of(
-          context,
-        ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
       ),
       leading: (showBack ?? canPop)
           ? IconButton(
@@ -81,9 +73,9 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
           : null,
       actions: actions,
       bottom: showBottomDivider
-          ? PreferredSize(
-              preferredSize: const Size.fromHeight(1),
-              child: Container(height: 1, color: dividerColor),
+          ? const PreferredSize(
+              preferredSize: Size.fromHeight(1),
+              child: Divider(height: 1, thickness: 1),
             )
           : null,
     );

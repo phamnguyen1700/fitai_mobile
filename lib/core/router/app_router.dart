@@ -1,151 +1,244 @@
 // lib/core/router/app_router.dart
+import 'package:fitai_mobile/core/widgets/app_bottom_nav.dart';
+import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
+import 'package:fitai_mobile/features/auth/presentation/views/verification_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-// Shell UI
 import '../widgets/app_scaffold.dart';
 
 // Screens
 import 'package:fitai_mobile/features/auth/presentation/views/splash_screen.dart';
 import 'package:fitai_mobile/features/auth/presentation/views/welcome_screen.dart';
-import 'package:fitai_mobile/features/ai/presentation/views/chat.dart';
-import 'package:fitai_mobile/features/daily/presentation/views/daily.dart';
+import 'package:fitai_mobile/features/home/presentation/views/chat.dart';
+import 'package:fitai_mobile/features/ai/presentation/views/daily.dart';
 import 'package:fitai_mobile/features/payment/presentation/views/payment.dart';
 import 'package:fitai_mobile/features/process/presentation/views/process.dart';
-import 'package:fitai_mobile/features/profile/presentation/views/profile.dart';
+import 'package:fitai_mobile/features/profile_setup/presentation/views/profile_setup_screen.dart';
 import 'package:fitai_mobile/features/setting/presentation/views/setting.dart';
+import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/overview_step.dart';
+import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/body_step.dart';
+import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/diet_step.dart';
+import 'package:fitai_mobile/features/payment/presentation/views/checkout.dart';
+import 'package:fitai_mobile/features/payment/presentation/views/result.dart';
 
-enum AppRoute { splash, welcome }
+enum AppRoute {
+  splash,
+  welcome,
+  verification,
+  setupOverview,
+  setupBody,
+  setupDiet,
+  planPreview,
+}
 
-/// demo: trạng thái đăng nhập – thay bằng auth provider thật của bạn
+/// Debug observer (giữ nếu bạn muốn xem log)
+class RouteLogger extends NavigatorObserver {
+  void _p(String s) => debugPrint('[RouteLogger] $s');
+  @override
+  void didPush(Route r, Route? p) =>
+      _p('didPush -> ${r.settings.name ?? r} from ${p?.settings.name ?? p}');
+  @override
+  void didPop(Route r, Route? p) =>
+      _p('didPop  -> ${r.settings.name ?? r} to ${p?.settings.name ?? p}');
+  @override
+  void didReplace({Route? newRoute, Route? oldRoute}) => _p(
+    'didReplace old=${oldRoute?.settings.name ?? oldRoute} new=${newRoute?.settings.name ?? newRoute}',
+  );
+  @override
+  void didRemove(Route r, Route? p) =>
+      _p('didRemove -> ${r.settings.name ?? r}');
+}
+
 final isLoggedInProvider = StateProvider<bool>((_) => false);
-
 final _rootKey = GlobalKey<NavigatorState>();
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // Khi auth thay đổi, router sẽ refresh
   ref.listen<bool>(isLoggedInProvider, (_, __) {});
-
   return GoRouter(
     navigatorKey: _rootKey,
     initialLocation: '/',
+    debugLogDiagnostics: true,
+    observers: [RouteLogger()],
 
     routes: [
-      // ====== Splash / Welcome (ngoài shell) ======
+      // ===== Splash / Welcome =====
       GoRoute(
         path: '/',
         name: AppRoute.splash.name,
-        pageBuilder: (context, state) => _fade(const SplashScreen()),
+        pageBuilder: (c, s) => _fade(s, const SplashScreen()),
       ),
       GoRoute(
         path: '/welcome',
         name: AppRoute.welcome.name,
-        pageBuilder: (context, state) => _fade(const WelcomeScreen()),
+        pageBuilder: (c, s) => _fade(s, const WelcomeScreen()),
+      ),
+      GoRoute(
+        path: '/verification',
+        name: AppRoute.verification.name,
+        pageBuilder: (c, s) => _fade(s, const VerificationScreen()),
       ),
 
-      // ====== Payment flow (ngoài bottom nav) ======
+      // ===== Setup flow (PHẲNG HÓA) =====
+      // gõ /setup -> tự nhảy /setup/overview
+      GoRoute(
+        path: '/setup',
+        parentNavigatorKey: _rootKey,
+        redirect: (_, __) => '/setup/overview',
+      ),
+      GoRoute(
+        path: '/setup/overview',
+        name: AppRoute.setupOverview.name,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (c, s) => _fade(s, const SetupOverviewStep()),
+      ),
+      GoRoute(
+        path: '/setup/body',
+        name: AppRoute.setupBody.name,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (c, s) => _fade(s, const SetupBodyStep()),
+      ),
+      GoRoute(
+        path: '/setup/diet',
+        name: AppRoute.setupDiet.name,
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (c, s) => _fade(s, const SetupDietStep()),
+      ),
+
+      // ===== Payment (ngoài shell) =====
       GoRoute(
         path: '/payment',
-        pageBuilder: (ctx, st) => _fade(
-          const AppScaffold(
-            title: 'Thanh toán',
-            body: PaymentScreen(),
-            // Vẫn để showBottomArea=true: AppBottomNav sẽ tự hiện footer điều khoản
-            showBottomArea: true,
-          ),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (c, s) => _fade(
+          s,
+          const PaymentScreen(), // màn chọn gói
         ),
         routes: [
           GoRoute(
-            path: 'process',
-            pageBuilder: (ctx, st) => _fade(
-              const AppScaffold(
-                title: 'Thanh toán',
-                body: ProcessScreen(),
-                showBottomArea: true,
-              ),
+            path: 'checkout',
+            parentNavigatorKey: _rootKey,
+            pageBuilder: (c, s) => _fade(
+              s,
+              CheckoutScreen(), // màn checkout
             ),
+          ),
+          GoRoute(
+            path: 'processing',
+            parentNavigatorKey: _rootKey,
+            pageBuilder: (c, s) => _fade(
+              s,
+              ProcessScreen(), // bạn đã có
+            ),
+          ),
+          GoRoute(
+            path: 'result/:status',
+            parentNavigatorKey: _rootKey,
+            pageBuilder: (c, s) {
+              final ok = s.pathParameters['status'] == 'success';
+              return _fade(s, PaymentResultScreen(success: ok));
+            },
           ),
         ],
       ),
 
-      // ====== SHELL 5 TAB (giữ state từng tab) ======
-      // Sử dụng các đường dẫn đã trùng với AppBottomNav:
-      // /home, /workout, /meal, /progress, /profile
+      // ===== SHELL 5 TAB =====
       StatefulShellRoute.indexedStack(
         branches: [
           _tabBranch(
             path: '/home',
-            title: 'Trang chủ',
-            builder: (ctx, st) => const DailyScreen(),
+            title: 'AI Coach',
+            wrapScaffold: false, // <— quan trọng
+            builder: (ctx, st) => Consumer(
+              builder: (context, ref, _) {
+                final view = ref.watch(homeViewProvider);
+                return AppScaffold(
+                  // <-- Chỉ Scaffold này cho /home
+                  title: 'AI Coach',
+                  showBack: view == HomeView.plan,
+                  showBottomArea: false,
+                  body: PopScope(
+                    canPop: view != HomeView.plan,
+                    onPopInvokedWithResult: (didPop, result) {
+                      if (!didPop && view == HomeView.plan) {
+                        ref.read(homeViewProvider.notifier).state =
+                            HomeView.chat;
+                      }
+                    },
+                    child: const HomeHostScreen(),
+                  ),
+                );
+              },
+            ),
           ),
           _tabBranch(
             path: '/workout',
             title: 'AI Coach',
-            builder: (ctx, st) => const ChatScreen(),
+            builder: (c, s) => const DailyScreen(),
           ),
           _tabBranch(
             path: '/meal',
             title: 'Cài đặt',
-            builder: (ctx, st) => const SettingScreen(),
+            builder: (c, s) => const SettingScreen(),
           ),
           _tabBranch(
             path: '/progress',
             title: 'Tiến độ',
-            builder: (ctx, st) => const ProcessScreen(),
+            builder: (c, s) => const ProcessScreen(),
           ),
           _tabBranch(
             path: '/profile',
             title: 'Hồ sơ',
-            builder: (ctx, st) => const ProfileScreen(),
+            builder: (c, s) => const ProfileSetupScreen(),
           ),
         ],
-        // builder không cần Scaffold vì mỗi branch đã dùng AppScaffold
-        builder: (ctx, state, navShell) => navShell,
+        builder: (ctx, state, navShell) =>
+            Scaffold(body: navShell, bottomNavigationBar: AppBottomNav()),
       ),
     ],
 
-    // Redirect (ví dụ)
-    redirect: (context, state) {
-      final onSplash = state.matchedLocation == '/';
-      if (onSplash) return null; // để splash tự điều hướng
-      // final loggedIn = ref.read(isLoggedInProvider);
-      // if (!loggedIn && state.matchedLocation.startsWith('/profile')) return '/welcome';
-      return null;
-    },
-
-    errorPageBuilder: (context, state) => _fade(
-      Scaffold(body: Center(child: Text('Route error: ${state.error}'))),
+    errorPageBuilder: (c, s) => _fade(
+      s,
+      Scaffold(body: Center(child: Text('Route error: ${s.error}'))),
     ),
   );
 });
 
-// Helper: tạo branch tab sử dụng AppScaffold (AppBar + BottomNav)
+// 3) Sửa _tabBranch: thêm flag wrapScaffold (mặc định true)
 StatefulShellBranch _tabBranch({
   required String path,
   required String title,
   required Widget Function(BuildContext, GoRouterState) builder,
+  bool wrapScaffold = true, // <—
 }) {
   return StatefulShellBranch(
     routes: [
       GoRoute(
         path: path,
-        pageBuilder: (ctx, st) => _fade(
-          AppScaffold(
-            title: title,
-            body: builder(ctx, st),
-            showBottomArea: true, // hiển thị BottomNav ở các tab chính
-          ),
-        ),
-        // Có thể thêm child routes cho từng tab tại đây
+        pageBuilder: (ctx, st) {
+          final child = builder(ctx, st);
+          return _fade(
+            st,
+            wrapScaffold
+                ? AppScaffold(
+                    // các tab thường vẫn được bọc
+                    title: title,
+                    showBack: false,
+                    body: child,
+                    showBottomArea: false,
+                  )
+                : child, // /home: không bọc nữa
+          );
+        },
       ),
     ],
   );
 }
 
-/// Transition mặc định (fade)
-CustomTransitionPage _fade(Widget child) => CustomTransitionPage(
-  child: child,
-  transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-      FadeTransition(opacity: animation, child: child),
-);
+CustomTransitionPage _fade(GoRouterState state, Widget child) =>
+    CustomTransitionPage(
+      key: state.pageKey,
+      child: child,
+      transitionsBuilder: (context, animation, secondary, child) =>
+          FadeTransition(opacity: animation, child: child),
+    );

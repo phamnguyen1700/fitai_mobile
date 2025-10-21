@@ -2,6 +2,8 @@ import 'package:fitai_mobile/core/utils/validation.dart';
 import 'package:flutter/material.dart';
 import 'package:fitai_mobile/core/widgets/widgets.dart'; // AppButton, AppTextField, ...
 import 'package:form_field_validator/form_field_validator.dart';
+import 'package:fitai_mobile/features/auth/presentation/views/verification_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class AuthBottomSheet {
   static void show(BuildContext context) {
@@ -197,6 +199,7 @@ class _RegisterFormState extends State<_RegisterForm> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Validate OK — tiến hành đăng ký')),
       );
+      context.go('/verification');
     }
   }
 

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-class SettingScreen extends StatelessWidget {
-  const SettingScreen({super.key});
+class DailyScreen extends StatelessWidget {
+  const DailyScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Setting',
+        'Daily',
         style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
       ),
     );

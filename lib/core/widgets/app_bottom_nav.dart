@@ -1,9 +1,10 @@
 // lib/core/widgets/app_bottom_nav.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fitai_mobile/core/widgets/app_icons.dart';
 
 class AppBottomNav extends StatelessWidget {
-  const AppBottomNav({super.key});
+  AppBottomNav({super.key});
 
   static const _setupPrefixes = <String>[
     '/welcome',
@@ -18,47 +19,55 @@ class AppBottomNav extends StatelessWidget {
   bool _isSetupLocation(String loc) =>
       _setupPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
 
+  /// Lấy current location an toàn cho go_router 12+ và trong ShellRoute
+  String _currentLocation(BuildContext context) {
+    final info = GoRouter.of(context).routeInformationProvider.value;
+    return info.uri.toString();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
+    final location = _currentLocation(context);
     final isSetup = _isSetupLocation(location);
 
-    final bg = Material(
-      color: Theme.of(context).navigationBarTheme.backgroundColor,
+    final theme = Theme.of(context);
+
+    final borderColor = theme.dividerColor;
+
+    return Material(
+      color: Colors.transparent,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.zero),
       ),
+      clipBehavior: Clip.antiAlias,
+      elevation: 0,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: Theme.of(context).dividerColor),
-          ),
+          border: Border(top: BorderSide(color: borderColor)),
         ),
         child: SafeArea(
           top: false,
-          minimum: const EdgeInsets.only(bottom: 6),
-          child: isSetup ? const _TermsFooter() : const _BottomNavBar(),
+          bottom:
+              true, // tôn trọng gesture area, nền cùng màu => nhìn vẫn “sát”
+          child: isSetup
+              ? const _TermsFooter()
+              : _BottomNavBar(currentLocationOf: _currentLocation),
         ),
       ),
     );
-    return bg;
   }
 }
 
 class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar();
+  const _BottomNavBar({required this.currentLocationOf});
+  final String Function(BuildContext) currentLocationOf;
 
   static const _tabs = [
-    ('/home', 'Trang chủ', Icons.home_outlined, Icons.home),
-    (
-      '/workout',
-      'Bài tập',
-      Icons.fitness_center_outlined,
-      Icons.fitness_center,
-    ),
-    ('/meal', 'Thực đơn', Icons.menu_book_outlined, Icons.menu_book),
-    ('/progress', 'Tiến độ', Icons.show_chart_outlined, Icons.show_chart),
-    ('/profile', 'Hồ sơ', Icons.person_outline, Icons.person),
+    ('/home', 'Trang chủ', AppIcons.homeOutline, AppIcons.home),
+    ('/workout', 'Bài tập', AppIcons.workoutOutline, AppIcons.workout),
+    ('/meal', 'Thực đơn', AppIcons.mealOutline, AppIcons.meal),
+    ('/progress', 'Tiến độ', AppIcons.progressOutline, AppIcons.progress),
+    ('/profile', 'Hồ sơ', AppIcons.profileOutline, AppIcons.profile),
   ];
 
   int _indexFrom(String loc) {
@@ -70,15 +79,24 @@ class _BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loc = GoRouterState.of(context).uri.toString();
+    final loc = currentLocationOf(context);
     final idx = _indexFrom(loc);
+
+    // Lấy shell nếu đang trong StatefulShellRoute
+    final shell = StatefulNavigationShell.maybeOf(context);
 
     return NavigationBar(
       selectedIndex: idx,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       onDestinationSelected: (i) {
-        final path = _tabs[i].$1;
-        if (loc != path) context.go(path);
+        if (shell != null) {
+          // ✅ chuyển tab đúng chuẩn, giữ backstack từng tab
+          shell.goBranch(i, initialLocation: false);
+        } else {
+          // Fallback nếu không ở trong shell
+          final path = _tabs[i].$1;
+          context.go(path);
+        }
       },
       destinations: [
         for (final t in _tabs)
@@ -94,6 +112,7 @@ class _BottomNavBar extends StatelessWidget {
 
 class _TermsFooter extends StatelessWidget {
   const _TermsFooter();
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -101,7 +120,7 @@ class _TermsFooter extends StatelessWidget {
     final muted = textStyle?.copyWith(color: cs.onSurfaceVariant);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
