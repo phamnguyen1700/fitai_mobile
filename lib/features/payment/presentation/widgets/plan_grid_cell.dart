@@ -30,12 +30,8 @@ class PlanGridCell extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
+          color: cs.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: selected ? cs.primary : cs.outlineVariant,
-            width: selected ? 1.6 : 1,
-          ),
           boxShadow: const [
             BoxShadow(
               blurRadius: 10,
@@ -55,7 +51,7 @@ class PlanGridCell extends StatelessWidget {
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
               textAlign: TextAlign.center,
             ),
-
+            Divider(height: 10, color: cs.outline),
             // Giá
             Column(
               children: [
@@ -67,7 +63,6 @@ class PlanGridCell extends StatelessWidget {
                   ),
                 ),
                 if (plan.discount != null) ...[
-                  const SizedBox(height: 2),
                   Text(
                     _formatVND(plan.price),
                     style: const TextStyle(
@@ -79,7 +74,6 @@ class PlanGridCell extends StatelessWidget {
                 ],
               ],
             ),
-            const SizedBox(height: 10),
 
             // Danh sách features (3–4 dòng như figma)
             ...plan.perks

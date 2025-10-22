@@ -87,6 +87,9 @@ flutter:
     - lib/core/assets/images/sticker1.png
     - lib/core/assets/images/sticker2.png
     - lib/core/assets/images/logo_gmail.png
+    - lib/core/assets/images/visa.png
+    - lib/core/assets/images/paypal.png
+    - lib/core/assets/images/momo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
