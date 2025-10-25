@@ -5,17 +5,18 @@ import 'package:go_router/go_router.dart';
 // Screens
 import 'package:fitai_mobile/features/auth/presentation/views/splash_screen.dart';
 import 'package:fitai_mobile/features/auth/presentation/views/welcome_screen.dart';
-// import các màn khác khi có: login, signup, home,...
+import 'package:fitai_mobile/features/home/presentation/views/home_screen.dart';
+// Auth providers
+import 'package:fitai_mobile/features/auth/presentation/providers/auth_providers.dart';
 
-enum AppRoute { splash, welcome /*, login, signup, home*/ }
-
-/// (Ví dụ) trạng thái đăng nhập – thay bằng auth provider thật của bạn
-final isLoggedInProvider = StateProvider<bool>((_) => false);
+enum AppRoute { splash, welcome, home }
 
 /// GoRouter provider – để dùng được Riverpod trong redirect/refresh
 final goRouterProvider = Provider<GoRouter>((ref) {
-  // Khi auth thay đổi, router sẽ refresh
-  ref.listen<bool>(isLoggedInProvider, (_, __) {});
+  // Listen to auth state changes to trigger router refresh
+  ref.listen<AsyncValue<AuthState>>(authNotifierProvider, (previous, next) {
+    // This will cause the router to re-evaluate redirects when auth state changes
+  });
 
   return GoRouter(
     initialLocation: '/',
@@ -30,20 +31,45 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoute.welcome.name,
         pageBuilder: (context, state) => _fade(const WelcomeScreen()),
       ),
-      // Thêm route khác:
-      // GoRoute(path: '/login', name: AppRoute.login.name, pageBuilder: ...),
-      // GoRoute(path: '/home', name: AppRoute.home.name, pageBuilder: ...),
+      GoRoute(
+        path: '/home',
+        name: AppRoute.home.name,
+        pageBuilder: (context, state) => _fade(const HomeScreen()),
+      ),
     ],
 
-    // (Tùy chọn) redirect toàn cục – ví dụ nếu đã login thì bỏ qua welcome
+    // Redirect logic based on auth state
     redirect: (context, state) {
-      final loggedIn = ref.read(isLoggedInProvider);
+      final authState = ref.read(authNotifierProvider);
+      
       final onSplash = state.matchedLocation == '/';
-      if (onSplash) return null; // để splash tự quyết định
-
-      // ví dụ: nếu đã login mà đang ở /welcome thì chuyển về /home
-      // if (loggedIn && state.matchedLocation == '/welcome') return '/home';
-      return null;
+      final onWelcome = state.matchedLocation == '/welcome';
+      final onHome = state.matchedLocation == '/home';
+      
+      // Let splash screen handle initial navigation
+      if (onSplash) return null;
+      
+      return authState.when(
+        // While loading, don't redirect to avoid premature redirects
+        loading: () => null,
+        // On error, treat as not authenticated
+        error: (_, __) {
+          if (onHome) return '/welcome';
+          return null;
+        },
+        // When data is available, make redirect decisions
+        data: (data) {
+          final isAuthenticated = data.isAuthenticated;
+          
+          // If authenticated and on welcome, go to home
+          if (isAuthenticated && onWelcome) return '/home';
+          
+          // If not authenticated and on home, go to welcome
+          if (!isAuthenticated && onHome) return '/welcome';
+          
+          return null;
+        },
+      );
     },
 
     errorPageBuilder: (context, state) => _fade(
