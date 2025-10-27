@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/app_scaffold.dart';
@@ -10,8 +11,7 @@ class PaymentResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     return AppScaffold(
-      title: 'Thanh toán',
-      showBack: false,
+      appBar: const AppAppBar(title: 'Thanh toán'),
       showLegalFooter: true,
       body: Center(
         child: Card(

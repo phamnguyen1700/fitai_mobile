@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../viewmodels/payment_state.dart';
 import '../widgets/plan_grid_cell.dart';
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 
 // lib/features/payment/presentation/views/payment.dart
 class PaymentScreen extends ConsumerWidget {
@@ -16,8 +17,7 @@ class PaymentScreen extends ConsumerWidget {
     final plans = notifier.plans; // data giả đã có trong notifier
 
     return AppScaffold(
-      title: 'Nâng cấp gói Premium',
-      showBack: true,
+      appBar: AppAppBar(title: 'Thanh toán'),
       showLegalFooter: true,
       body: ListView(
         padding: const EdgeInsets.all(12),

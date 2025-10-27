@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 import 'package:fitai_mobile/core/widgets/legal_footer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,9 +40,8 @@ class SetupBodyStep extends ConsumerWidget {
     }
 
     return AppScaffold(
-      title: 'Thiết lập hồ sơ cá nhân',
+      appBar: AppAppBar(title: 'Thiết lập hồ sơ cá nhân'),
       showLegalFooter: true,
-      showBack: true,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),

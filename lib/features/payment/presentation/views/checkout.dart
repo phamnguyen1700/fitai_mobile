@@ -1,4 +1,5 @@
 // lib/features/payment/presentation/views/checkout.dart
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +21,7 @@ class CheckoutScreen extends ConsumerWidget {
 
     if (plan == null) {
       return const AppScaffold(
-        title: 'Thanh toán',
+        appBar: AppAppBar(title: 'Thanh toán'),
         body: Center(child: Text('Vui lòng chọn gói trước.')),
       );
     }
@@ -41,9 +42,8 @@ class CheckoutScreen extends ConsumerWidget {
     }
 
     return AppScaffold(
-      title: 'Thanh toán',
-      showBack: true,
       showLegalFooter: true,
+      appBar: AppAppBar(title: 'Thanh toán'),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

@@ -1,17 +1,18 @@
+// lib/core/widgets/app_bar.dart
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import '../config/theme/header_theme.dart';
 
 enum AppBarStyle { auto, surface }
 
-/// AppBar cơ bản dùng cho hầu hết màn hình
 class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget>? actions;
   final bool? showBack;
   final VoidCallback? onBack;
   final bool showBottomDivider;
-  final Color? backgroundColor;
   final double height;
+  final Color? backgroundColor;
   final AppBarStyle style;
 
   const AppAppBar({
@@ -21,8 +22,8 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.showBack,
     this.onBack,
     this.showBottomDivider = true,
-    this.backgroundColor,
     this.height = kToolbarHeight,
+    this.backgroundColor,
     this.style = AppBarStyle.auto,
   });
 
@@ -30,32 +31,29 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize =>
       Size.fromHeight(height + (showBottomDivider ? 1 : 0));
 
-  String _currentLocation(BuildContext context) {
-    // ✅ dùng uri thay vì location (không deprecated, hoạt động trong ShellRoute)
-    final info = GoRouter.of(context).routeInformationProvider.value;
-    return info.uri.toString();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     final canPop = Navigator.of(context).canPop();
 
-    final bg = backgroundColor;
-
-    final bottomDivider = showBottomDivider
-        ? const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, thickness: 1),
-          )
-        : null;
+    final ht = theme.extension<AppHeaderTheme>();
+    final glassColor =
+        ht?.backdropColor ?? theme.colorScheme.surface.withOpacity(0.5);
+    final sigma = ht?.blurSigma ?? 12.0;
 
     return AppBar(
+      toolbarHeight: height,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
-      backgroundColor: bg,
+      backgroundColor: Colors.transparent, // glass
+      flexibleSpace: ClipRect(
+        // blur nền AppBar
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          child: Container(color: backgroundColor ?? glassColor),
+        ),
+      ),
       centerTitle: true,
       titleSpacing: 0,
       title: Text(

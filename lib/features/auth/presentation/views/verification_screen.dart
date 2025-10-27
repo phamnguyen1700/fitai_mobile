@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:fitai_mobile/core/widgets/app_scaffold.dart';
 import 'package:fitai_mobile/core/widgets/app_card.dart';
@@ -24,8 +25,7 @@ class VerificationScreen extends StatelessWidget {
         }
       },
       child: AppScaffold(
-        title: 'Xác thực tài khoản',
-        showBack: true,
+        appBar: AppAppBar(title: 'Xác thực tài khoản'),
         showBottomArea: false,
         body: SafeArea(
           child: Column(

@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/core/widgets/app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,9 +25,8 @@ class SetupDietStep extends ConsumerWidget {
     debugPrint('[Diet] build -> loc=$loc | stack=$stack');
 
     return AppScaffold(
-      title: 'Thiết lập hồ sơ cá nhân',
+      appBar: AppAppBar(title: 'Thiết lập hồ sơ cá nhân'),
       showLegalFooter: true,
-      showBack: true,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),

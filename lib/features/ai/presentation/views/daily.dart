@@ -1,3 +1,4 @@
+// lib/features/ai/presentation/views/daily.dart
 import 'package:flutter/material.dart';
 
 class DailyScreen extends StatelessWidget {
@@ -5,10 +6,18 @@ class DailyScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Daily',
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Danh sách bài tập hôm nay',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          SizedBox(height: 12),
+          // ... danh sách các card bài tập, bài hướng dẫn, v.v.
+        ],
       ),
     );
   }

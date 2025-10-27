@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../color/color_scheme.dart';
 import 'app_button_theme.dart';
 import 'app_tab_theme.dart';
+import 'header_theme.dart';
 
 class AppTheme {
   // Public: dùng thẳng 2 biến này trong MaterialApp
@@ -14,11 +15,6 @@ class AppTheme {
         ? const Color.fromARGB(255, 36, 36, 36) // DARK FIXED
         : const Color.fromARGB(255, 228, 228, 228); // LIGHT FIXED
 
-    Color appBarBg(ColorScheme cs) => cs.brightness == Brightness.dark
-        ? Colors
-              .black // hơi sáng hơn body 1 nấc
-        : Colors.white; // trắng mỏng cho light
-
     Color barBg(ColorScheme cs) => cs.brightness == Brightness.dark
         ? Colors
               .black // = AppBar dark
@@ -27,6 +23,12 @@ class AppTheme {
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs,
+      extensions: [
+        AppHeaderTheme(
+          backdropColor: barBg(cs).withOpacity(0.35),
+          blurSigma: 12,
+        ),
+      ],
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: barBg(cs),
         modalBackgroundColor: barBg(cs),
@@ -44,8 +46,7 @@ class AppTheme {
       scaffoldBackgroundColor: scaffoldBg(cs),
       // === AppBar ===
       appBarTheme: AppBarTheme(
-        backgroundColor: appBarBg(cs), // nền “đục” theo mode
-        surfaceTintColor: Colors.transparent, // không ám tint
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
@@ -56,7 +57,6 @@ class AppTheme {
           fontWeight: FontWeight.w600,
           fontSize: 18,
         ),
-        // đảm bảo icon status bar đúng màu theo mode
         systemOverlayStyle: cs.brightness == Brightness.dark
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
