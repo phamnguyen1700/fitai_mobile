@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../../../daily/presentation/models/meal_models.dart'; // <-- model chung
 import 'meal_item_tile.dart';
 
 class MealDayCard extends StatelessWidget {
   final String dayTitle;
-  final List<MealGroup> meals; // mỗi bữa (Meal 1, 2, 3,...)
+  final List<MealGroup> meals;
 
   const MealDayCard({super.key, required this.dayTitle, required this.meals});
 
@@ -35,8 +36,6 @@ class MealDayCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-
-            // các bữa trong ngày
             for (int i = 0; i < meals.length; i++) ...[
               MealGroupTile(group: meals[i], index: i + 1),
               if (i != meals.length - 1) Divider(height: 22, color: cs.outline),
@@ -46,18 +45,4 @@ class MealDayCard extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Bữa ăn trong ngày (Meal 1, Meal 2,...)
-class MealGroup {
-  final String title; // ví dụ: "Sáng" / "Trưa" / "Tối"
-  final List<MealItem> items; // danh sách món trong bữa
-  MealGroup(this.title, this.items);
-}
-
-/// 1 món ăn (KHÔNG có hình)
-class MealItem {
-  final String name; // tên món
-  final Map<String, String> portions; // thành phần -> định lượng
-  MealItem(this.name, this.portions);
 }

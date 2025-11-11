@@ -19,7 +19,7 @@ import 'package:fitai_mobile/features/payment/presentation/views/payment.dart';
 import 'package:fitai_mobile/features/payment/presentation/views/checkout.dart';
 import 'package:fitai_mobile/features/payment/presentation/views/result.dart';
 import 'package:fitai_mobile/features/process/presentation/views/process.dart';
-import 'package:fitai_mobile/features/ai/presentation/views/daily.dart';
+import 'package:fitai_mobile/features/daily/presentation/views/daily.dart';
 import 'package:fitai_mobile/features/setting/presentation/views/setting.dart';
 import 'package:fitai_mobile/features/home/presentation/views/chat.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
@@ -78,7 +78,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/verification',
         name: AppRoute.verification.name,
-        pageBuilder: (c, s) => _fade(s, const VerificationScreen()),
+        pageBuilder: (c, s) {
+          final email = s.extra is String ? s.extra as String : null;
+          return _fade(s, VerificationScreen(email: email));
+        },
       ),
 
       // ===== Setup flow =====
@@ -153,27 +156,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 
           // --- WORKOUT ---
           _tabBranch(
-            path: '/workout',
+            path: '/daily',
             builder: (ctx, st) => Consumer(
               builder: (context, ref, _) {
-                final header = buildUserHeaderFor(ref, '/workout');
+                final header = buildUserHeaderFor(ref, '/daily');
                 return AppScaffold(
                   appBar: UserHeaderAppBar(header: header!),
                   body: const DailyScreen(),
-                );
-              },
-            ),
-          ),
-
-          // --- MEAL ---
-          _tabBranch(
-            path: '/meal',
-            builder: (ctx, st) => Consumer(
-              builder: (context, ref, _) {
-                final header = buildUserHeaderFor(ref, '/meal');
-                return AppScaffold(
-                  appBar: UserHeaderAppBar(header: header!),
-                  body: const SettingScreen(),
                 );
               },
             ),

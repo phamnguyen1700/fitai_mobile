@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'meal_day_card.dart';
+import '../../../../daily/presentation/models/meal_models.dart';
 
-/// Hiển thị 1 nhóm bữa ăn (Meal 1, Meal 2,...)
 class MealGroupTile extends StatelessWidget {
   final MealGroup group;
   final int index;
@@ -14,7 +13,6 @@ class MealGroupTile extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header "Meal 1 – Sáng"
         Row(
           children: [
             Container(
@@ -23,9 +21,9 @@ class MealGroupTile extends StatelessWidget {
                 color: cs.primary,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Text(
-                'Meal $index',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+              child: const Text(
+                'Meal',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
@@ -33,15 +31,12 @@ class MealGroupTile extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 8),
-
-        // danh sách món trong bữa
         for (final item in group.items) MealItemTile(item: item),
       ],
     );
   }
 }
 
-/// 1 món ăn: tên + các thành phần/định lượng (không có ảnh)
 class MealItemTile extends StatelessWidget {
   final MealItem item;
   const MealItemTile({super.key, required this.item});

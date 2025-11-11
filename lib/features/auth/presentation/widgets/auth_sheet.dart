@@ -1,9 +1,10 @@
 import 'package:fitai_mobile/core/utils/validation.dart';
 import 'package:flutter/material.dart';
-import 'package:fitai_mobile/core/widgets/widgets.dart'; // AppButton, AppTextField, ...
-import 'package:form_field_validator/form_field_validator.dart';
-import 'package:fitai_mobile/features/auth/presentation/views/verification_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:fitai_mobile/core/widgets/widgets.dart';
+
+import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
 
 class AuthBottomSheet {
   static void show(BuildContext context) {
@@ -69,17 +70,18 @@ class _AuthSheetContentState extends State<_AuthSheetContent>
 }
 
 // === FORM ĐĂNG NHẬP ===
-class _LoginForm extends StatefulWidget {
+class _LoginForm extends ConsumerStatefulWidget {
   const _LoginForm();
 
   @override
-  State<_LoginForm> createState() => _LoginFormState();
+  ConsumerState<_LoginForm> createState() => _LoginFormState();
 }
 
-class _LoginFormState extends State<_LoginForm> {
+class _LoginFormState extends ConsumerState<_LoginForm> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtl = TextEditingController();
   final _passCtl = TextEditingController();
+  bool _rememberMe = false;
 
   @override
   void dispose() {
@@ -88,19 +90,75 @@ class _LoginFormState extends State<_LoginForm> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // TODO: call API
-      debugPrint('LOGIN email=${_emailCtl.text} pass=${_passCtl.text}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Validate OK — tiến hành đăng nhập')),
-      );
+      // Gọi login qua notifier
+      await ref
+          .read(authNotifierProvider.notifier)
+          .login(
+            email: _emailCtl.text.trim(),
+            password: _passCtl.text,
+            rememberMe: _rememberMe,
+          );
+
+      // Lấy state sau khi login
+      final authState = ref.read(authNotifierProvider).value;
+
+      if (authState?.isAuthenticated == true) {
+        if (!mounted) return;
+
+        // 👇 Lấy bước onboarding từ user
+        final step = authState!.user?.onboardingStep;
+
+        String target;
+
+        switch (step) {
+          case null:
+          case 'None':
+          case 'Profile':
+            target = '/setup/overview';
+            break;
+
+          case 'BodyImage':
+            target = '/setup/body';
+            break;
+
+          case 'DietaryPreference':
+            target = '/setup/diet';
+            break;
+
+          default:
+            target = '/home';
+            break;
+        }
+
+        // Đóng bottom sheet nếu đang mở
+        Navigator.of(context).pop();
+
+        // Điều hướng đến màn tương ứng
+        context.go(target);
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Chào mừng bạn quay lại 👋')));
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Đăng nhập thành công! Chào mừng ${authState.user?.email ?? 'bạn'}!',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final errorText = ref.watch(authErrorProvider);
+
     return Form(
       key: _formKey,
       autovalidateMode: AutovalidateMode.onUnfocus,
@@ -118,7 +176,6 @@ class _LoginFormState extends State<_LoginForm> {
           // Email
           AppTextField(
             controller: _emailCtl,
-
             label: 'Email',
             prefixIcon: Icons.email_outlined,
             hintText: 'Nhập email',
@@ -143,7 +200,11 @@ class _LoginFormState extends State<_LoginForm> {
             children: [
               Row(
                 children: [
-                  Checkbox(value: false, onChanged: (_) {}),
+                  Checkbox(
+                    value: _rememberMe,
+                    onChanged: (value) =>
+                        setState(() => _rememberMe = value ?? false),
+                  ),
                   Text(
                     'Ghi nhớ đăng nhập',
                     style: TextStyle(color: cs.onSurfaceVariant),
@@ -154,13 +215,30 @@ class _LoginFormState extends State<_LoginForm> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
 
-          AppButton(
-            label: 'Đăng nhập',
-            variant: AppButtonVariant.filled,
-            fullWidth: true,
-            onPressed: _submit,
+          if (errorText != null && errorText.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                errorText,
+                style: TextStyle(color: cs.error, fontSize: 13),
+              ),
+            ),
+
+          const SizedBox(height: 8),
+
+          Consumer(
+            builder: (context, ref, child) {
+              final isLoading = ref.watch(isAuthLoadingProvider);
+
+              return AppButton(
+                label: isLoading ? 'Đang đăng nhập...' : 'Đăng nhập',
+                variant: AppButtonVariant.filled,
+                fullWidth: true,
+                onPressed: isLoading ? null : _submit,
+              );
+            },
           ),
         ],
       ),
@@ -169,14 +247,14 @@ class _LoginFormState extends State<_LoginForm> {
 }
 
 // === FORM ĐĂNG KÝ ===
-class _RegisterForm extends StatefulWidget {
+class _RegisterForm extends ConsumerStatefulWidget {
   const _RegisterForm();
 
   @override
-  State<_RegisterForm> createState() => _RegisterFormState();
+  ConsumerState<_RegisterForm> createState() => _RegisterFormState();
 }
 
-class _RegisterFormState extends State<_RegisterForm> {
+class _RegisterFormState extends ConsumerState<_RegisterForm> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtl = TextEditingController();
   final _passCtl = TextEditingController();
@@ -190,16 +268,54 @@ class _RegisterFormState extends State<_RegisterForm> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // TODO: call API
-      debugPrint(
-        'REGISTER email=${_emailCtl.text} pass=${_passCtl.text} confirm=${_confirmCtl.text}',
-      );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Validate OK — tiến hành đăng ký')),
-      );
-      context.go('/verification');
+      // Validate password confirmation
+      if (_passCtl.text != _confirmCtl.text) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mật khẩu xác nhận không khớp'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // Call API through provider
+      await ref
+          .read(authNotifierProvider.notifier)
+          .register(
+            email: _emailCtl.text.trim(),
+            password: _passCtl.text,
+            passwordConfirmation: _confirmCtl.text,
+          );
+
+      // Check if registration was successful -> go to OTP (verification)
+      final authState = ref.read(authNotifierProvider).value;
+      if (authState?.error == null) {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close the bottom sheet
+          context.go(
+            '/verification',
+            extra: _emailCtl.text.trim(),
+          ); // Navigate to OTP screen with email
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đăng ký thành công! Vui lòng nhập mã OTP.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đăng ký thất bại: ${authState!.error}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -254,11 +370,17 @@ class _RegisterFormState extends State<_RegisterForm> {
           ),
           const SizedBox(height: 16),
 
-          AppButton(
-            label: 'Đăng ký',
-            variant: AppButtonVariant.filled,
-            fullWidth: true,
-            onPressed: _submit,
+          Consumer(
+            builder: (context, ref, child) {
+              final isLoading = ref.watch(isAuthLoadingProvider);
+
+              return AppButton(
+                label: isLoading ? 'Đang đăng ký...' : 'Đăng ký',
+                variant: AppButtonVariant.filled,
+                fullWidth: true,
+                onPressed: isLoading ? null : _submit,
+              );
+            },
           ),
         ],
       ),

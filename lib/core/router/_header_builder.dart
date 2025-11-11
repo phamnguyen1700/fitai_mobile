@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../widgets/user_header_appbar.dart';
 
 PreferredSizeWidget? buildUserHeaderFor(WidgetRef ref, String path) {
-  if (path != '/workout' && path != '/meal' && path != '/progress') return null;
+  if (path != '/daily' && path != '/progress') return null;
 
   // dữ liệu tạm
   const displayName = 'Thảo Vi';

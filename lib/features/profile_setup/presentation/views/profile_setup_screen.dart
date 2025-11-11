@@ -64,11 +64,15 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   Widget _buildStep() {
     switch (_step) {
       case 0:
-        return UserDataFormCard(initial: _draft, onSubmit: _onOverviewSubmit);
+        return UserDataFormCard(
+          initial: _draft,
+          onSubmit: _onOverviewSubmit,
+          activityLevels:
+              const [], // Add missing required argument, replace with actual list if needed
+        );
 
       case 1:
         return BodyUploadCard(
-          onPickFromLibrary: _pickFromLibrary,
           onScanByCamera: _scanByCamera,
           onContinue: _onBodyContinue,
         );

@@ -1,27 +1,79 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
+import 'package:fitai_mobile/features/profile_setup/data/models/activity_level_metadata.dart';
 
 /// =====================
-/// Models (đơn giản hóa)
+/// ProfileDraft – map với API
 /// =====================
-enum Gender { male, female, other }
-
-enum Goal { loseFat, maintain, gainMuscle }
-
 class ProfileDraft {
-  double? heightCm;
-  double? weightKg;
-  int? age;
-  Gender gender = Gender.male;
+  String? firstName;
+  String? lastName;
+  DateTime? dateOfBirth;
+
+  double? height;
+  double? weight;
+  Gender? gender;
   Goal? goal;
+  ActivityLevel? activityLevel;
 
-  // body & diet
-  String? localPhotoPath; // ảnh từ thư viện/camera
-  int mealsPerDay = 3;
-  Set<String> dietLikes = {};
-  Set<String> dietDislikes = {};
+  // Body & diet
+  String? localPhotoPath;
+  String? frontBodyPhotoPath;
+  String? sideBodyPhotoPath;
+
+  // Diet fields
+  int mealsPerDay;
+  Set<String> dietLikes;
+  Set<String> dietDislikes;
   String? extraFoods;
+  String? cuisineType;
+  String? allergies;
 
-  ProfileDraft();
+  ProfileDraft({
+    this.firstName,
+    this.lastName,
+    this.dateOfBirth,
+    this.height,
+    this.weight,
+    this.gender,
+    this.goal,
+    this.activityLevel = ActivityLevel.Sedentary,
+    this.localPhotoPath,
+    this.frontBodyPhotoPath,
+    this.sideBodyPhotoPath,
+    this.mealsPerDay = 3,
+    Set<String>? dietLikes,
+    Set<String>? dietDislikes,
+    this.extraFoods,
+    this.cuisineType,
+    this.allergies,
+  }) : dietLikes = dietLikes ?? {},
+       dietDislikes = dietDislikes ?? {};
+
+  factory ProfileDraft.fromUser(UserModel user) => ProfileDraft(
+    firstName: user.firstName,
+    lastName: user.lastName,
+    dateOfBirth: user.dateOfBirth,
+    height: user.height,
+    weight: user.weight,
+    gender: user.gender,
+    goal: user.goal,
+    activityLevel: user.activityLevel ?? ActivityLevel.Sedentary,
+  );
+}
+
+extension ProfileDraftDietDto on ProfileDraft {
+  Map<String, dynamic> toDietDto() => {
+    'mealsPerDay': mealsPerDay,
+    'cuisineType': cuisineType,
+    'allergies': allergies,
+    'preferredIngredients': dietLikes.isNotEmpty ? dietLikes.join(', ') : null,
+    'avoidIngredients': dietDislikes.isNotEmpty
+        ? dietDislikes.join(', ')
+        : null,
+    'notes': extraFoods,
+  }..removeWhere((_, v) => v == null);
 }
 
 /// =====================
@@ -54,7 +106,6 @@ class StepHeader extends StatelessWidget {
         Center(
           child: Column(
             children: [
-              // (icon placeholder) – tuỳ bạn thay asset
               const SizedBox(height: 8),
               Text(
                 title,
@@ -127,18 +178,18 @@ class AppContinueButton extends StatelessWidget {
   }
 }
 
-/// =====================
-/// STEP 1 – Tổng quan
-/// =====================
+// STEP 1 – Tổng quan (full DTO)
 class UserDataFormCard extends StatefulWidget {
   const UserDataFormCard({
     super.key,
     required this.initial,
     required this.onSubmit,
+    required this.activityLevels,
   });
 
   final ProfileDraft initial;
   final ValueChanged<ProfileDraft> onSubmit;
+  final List<ActivityLevelMetadata> activityLevels;
 
   @override
   State<UserDataFormCard> createState() => _UserDataFormCardState();
@@ -146,33 +197,50 @@ class UserDataFormCard extends StatefulWidget {
 
 class _UserDataFormCardState extends State<UserDataFormCard> {
   final _formKey = GlobalKey<FormState>();
+
+  late final TextEditingController _firstNameCtl;
+  late final TextEditingController _lastNameCtl;
   late final TextEditingController _hCtl;
   late final TextEditingController _wCtl;
-  late final TextEditingController _ageCtl;
-  Gender _gender = Gender.male;
+  late final TextEditingController _dobCtl;
+
+  Gender? _gender;
   Goal? _goal;
+  ActivityLevel _activityLevel = ActivityLevel.Sedentary;
+  DateTime? _dob;
 
   @override
   void initState() {
     super.initState();
+    _firstNameCtl = TextEditingController(text: widget.initial.firstName ?? '');
+    _lastNameCtl = TextEditingController(text: widget.initial.lastName ?? '');
     _hCtl = TextEditingController(
-      text: widget.initial.heightCm?.toString() ?? '',
+      text: widget.initial.height?.toString() ?? '',
     );
     _wCtl = TextEditingController(
-      text: widget.initial.weightKg?.toString() ?? '',
+      text: widget.initial.weight?.toString() ?? '',
     );
-    _ageCtl = TextEditingController(text: widget.initial.age?.toString() ?? '');
-    _gender = widget.initial.gender;
+    _dob = widget.initial.dateOfBirth;
+    _dobCtl = TextEditingController(
+      text: _dob != null ? _formatDate(_dob!) : '',
+    );
+    _gender = widget.initial.gender ?? Gender.M;
     _goal = widget.initial.goal;
+    _activityLevel = widget.initial.activityLevel ?? ActivityLevel.Sedentary;
   }
 
   @override
   void dispose() {
+    _firstNameCtl.dispose();
+    _lastNameCtl.dispose();
     _hCtl.dispose();
     _wCtl.dispose();
-    _ageCtl.dispose();
+    _dobCtl.dispose();
     super.dispose();
   }
+
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
   String? _numReq(String? v, {double? min, double? max}) {
     if (v == null || v.trim().isEmpty) return 'Bắt buộc';
@@ -189,8 +257,7 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
       children: [
         const StepHeader(
           title: 'Thiết lập hồ sơ cá nhân',
-          subtitle:
-              'Điền thông tin cơ bản để AI thiết kế kế hoạch riêng cho bạn.',
+          subtitle: 'Điền thông tin cơ bản để AI thiết kế kế hoạch riêng.',
           current: 1,
         ),
         SectionCard(
@@ -198,6 +265,59 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
             key: _formKey,
             child: Column(
               children: [
+                // First & last name
+                TextFormField(
+                  controller: _firstNameCtl,
+                  decoration: const InputDecoration(
+                    labelText: 'Họ',
+                    hintText: 'Nhập họ',
+                  ),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Bắt buộc' : null,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _lastNameCtl,
+                  decoration: const InputDecoration(
+                    labelText: 'Tên đệm và tên',
+                    hintText: 'Nhập tên',
+                  ),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? 'Bắt buộc' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // DOB
+                TextFormField(
+                  controller: _dobCtl,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Ngày sinh',
+                    hintText: 'Chọn ngày sinh',
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  onTap: () async {
+                    final now = DateTime.now();
+                    final firstDate = DateTime(now.year - 100);
+                    final lastDate = DateTime(now.year - 10);
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _dob ?? DateTime(now.year - 20),
+                      firstDate: firstDate,
+                      lastDate: lastDate,
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        _dob = picked;
+                        _dobCtl.text = _formatDate(picked);
+                      });
+                    }
+                  },
+                  validator: (_) => _dob == null ? 'Chọn ngày sinh' : null,
+                ),
+                const SizedBox(height: 16),
+
+                // Height / Weight
                 TextFormField(
                   controller: _hCtl,
                   keyboardType: TextInputType.number,
@@ -217,28 +337,22 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
                   ),
                   validator: (v) => _numReq(v, min: 25, max: 300),
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _ageCtl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Tuổi',
-                    hintText: 'Nhập tuổi',
-                  ),
-                  validator: (v) {
-                    final err = _numReq(v, min: 10, max: 100);
-                    return err;
-                  },
-                ),
                 const SizedBox(height: 16),
+
                 _GenderSelector(
-                  value: _gender,
+                  value: _gender ?? Gender.M,
                   onChanged: (g) => setState(() => _gender = g),
                 ),
                 const SizedBox(height: 12),
                 _GoalDropdown(
                   value: _goal,
                   onChanged: (g) => setState(() => _goal = g),
+                ),
+                const SizedBox(height: 12),
+                _ActivityLevelDropdown(
+                  value: _activityLevel,
+                  options: widget.activityLevels,
+                  onChanged: (al) => setState(() => _activityLevel = al),
                 ),
               ],
             ),
@@ -247,12 +361,17 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
         AppContinueButton(
           onPressed: () {
             if (!(_formKey.currentState?.validate() ?? false)) return;
+
             final draft = widget.initial
-              ..heightCm = double.parse(_hCtl.text.replaceAll(',', '.'))
-              ..weightKg = double.parse(_wCtl.text.replaceAll(',', '.'))
-              ..age = int.parse(_ageCtl.text)
+              ..firstName = _firstNameCtl.text.trim()
+              ..lastName = _lastNameCtl.text.trim()
+              ..dateOfBirth = _dob
+              ..height = double.parse(_hCtl.text.replaceAll(',', '.'))
+              ..weight = double.parse(_wCtl.text.replaceAll(',', '.'))
               ..gender = _gender
-              ..goal = _goal;
+              ..goal = _goal
+              ..activityLevel = _activityLevel;
+
             widget.onSubmit(draft);
           },
         ),
@@ -272,21 +391,15 @@ class _GenderSelector extends StatelessWidget {
       children: [
         const SizedBox(width: 12),
         ChoiceChip(
-          selected: value == Gender.male,
+          selected: value == Gender.M,
           label: const Text('Nam'),
-          onSelected: (_) => onChanged(Gender.male),
+          onSelected: (_) => onChanged(Gender.M),
         ),
         const SizedBox(width: 8),
         ChoiceChip(
-          selected: value == Gender.female,
+          selected: value == Gender.F,
           label: const Text('Nữ'),
-          onSelected: (_) => onChanged(Gender.female),
-        ),
-        const SizedBox(width: 8),
-        ChoiceChip(
-          selected: value == Gender.other,
-          label: const Text('Khác'),
-          onSelected: (_) => onChanged(Gender.other),
+          onSelected: (_) => onChanged(Gender.F),
         ),
       ],
     );
@@ -304,9 +417,13 @@ class _GoalDropdown extends StatelessWidget {
       value: value,
       decoration: const InputDecoration(labelText: 'Mục tiêu'),
       items: const [
-        DropdownMenuItem(value: Goal.loseFat, child: Text('Giảm mỡ')),
-        DropdownMenuItem(value: Goal.maintain, child: Text('Giữ cân')),
-        DropdownMenuItem(value: Goal.gainMuscle, child: Text('Tăng cơ')),
+        DropdownMenuItem(
+          value: Goal.Weight_Loss,
+          child: Text('Giảm mỡ / Giảm cân'),
+        ),
+        DropdownMenuItem(value: Goal.Maintain_Weight, child: Text('Giữ cân')),
+        DropdownMenuItem(value: Goal.Weight_Gain, child: Text('Tăng cân')),
+        DropdownMenuItem(value: Goal.Build_Muscle, child: Text('Tăng cơ')),
       ],
       onChanged: onChanged,
       validator: (v) => v == null ? 'Chọn mục tiêu' : null,
@@ -314,79 +431,350 @@ class _GoalDropdown extends StatelessWidget {
   }
 }
 
+class _ActivityLevelDropdown extends StatelessWidget {
+  const _ActivityLevelDropdown({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.options,
+  });
+
+  final ActivityLevel value;
+  final ValueChanged<ActivityLevel> onChanged;
+  final List<ActivityLevelMetadata> options;
+
+  @override
+  Widget build(BuildContext context) {
+    // Fallback labels nếu metadata lỗi
+    const fallbackLabels = <ActivityLevel, String>{
+      ActivityLevel.Sedentary: 'Ít vận động',
+      ActivityLevel.LightlyActive: 'Nhẹ (1–2 buổi/tuần)',
+      ActivityLevel.ModeratelyActive: 'Vừa (3–4 buổi/tuần)',
+      ActivityLevel.VeryActive: 'Năng động (5+ buổi/tuần)',
+      ActivityLevel.ExtraActive: 'Rất năng động / vận động viên',
+    };
+
+    final items = <DropdownMenuItem<ActivityLevel>>[];
+
+    if (options.isNotEmpty) {
+      for (final meta in options) {
+        final level = _activityFromName(meta.name);
+        if (level == null) continue;
+        items.add(
+          DropdownMenuItem<ActivityLevel>(
+            value: level,
+            child: Text(meta.displayLabel),
+          ),
+        );
+      }
+    } else {
+      // fallback: dùng enum trực tiếp
+      for (final level in ActivityLevel.values) {
+        final label = fallbackLabels[level] ?? level.apiValue;
+        items.add(
+          DropdownMenuItem<ActivityLevel>(value: level, child: Text(label)),
+        );
+      }
+    }
+
+    return DropdownButtonFormField<ActivityLevel>(
+      value: value,
+      decoration: const InputDecoration(labelText: 'Mức độ vận động'),
+      items: items,
+      onChanged: (v) {
+        if (v != null) onChanged(v);
+      },
+    );
+  }
+}
+
+ActivityLevel? _activityFromName(String name) {
+  switch (name) {
+    case 'Sedentary':
+      return ActivityLevel.Sedentary;
+    case 'LightlyActive':
+      return ActivityLevel.LightlyActive;
+    case 'ModeratelyActive':
+      return ActivityLevel.ModeratelyActive;
+    case 'VeryActive':
+      return ActivityLevel.VeryActive;
+    case 'ExtraActive':
+      return ActivityLevel.ExtraActive;
+    default:
+      return null;
+  }
+}
+
 /// =====================
-/// STEP 2 – Upload cơ thể
+/// STEP 2 – Dữ liệu cơ thể (2 ảnh)
 /// =====================
 class BodyUploadCard extends StatelessWidget {
   const BodyUploadCard({
     super.key,
-    required this.onPickFromLibrary,
     required this.onScanByCamera,
     required this.onContinue,
+    this.frontImagePath,
+    this.sideImagePath,
   });
 
-  final Future<void> Function() onPickFromLibrary;
   final Future<void> Function() onScanByCamera;
   final VoidCallback onContinue;
+  final String? frontImagePath;
+  final String? sideImagePath;
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasFront = frontImagePath != null && frontImagePath!.isNotEmpty;
+    final hasSide = sideImagePath != null && sideImagePath!.isNotEmpty;
+    final allDone = hasFront && hasSide;
+    final hasAny = hasFront || hasSide;
+
     return Column(
       children: [
         const StepHeader(
-          title: 'Upload ảnh cơ thể',
-          subtitle: 'AI sẽ phân tích Bodygram để cá nhân hoá kế hoạch.',
+          title: 'Lấy dữ liệu cơ thể',
+          subtitle: 'Hình ảnh sẽ được bảo mật.',
           current: 2,
         ),
-        SectionCard(
-          child: Column(
-            children: [
-              Container(
-                height: 140,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+
+        // =============================
+        // Chỉ hiện "Tư thế chính xác" KHI CHƯA CÓ ẢNH NÀO
+        // =============================
+        if (!hasAny)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'lib/core/assets/images/front.png',
+                              height: 180,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Chính diện',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'lib/core/assets/images/right.png',
+                              height: 180,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Bên hông',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                const Center(
+                  child: Text(
+                    'Tư thế chính xác',
+                    style: TextStyle(fontWeight: FontWeight.w400, fontSize: 10),
                   ),
                 ),
-                child: Center(
-                  child: TextButton.icon(
-                    onPressed: onPickFromLibrary,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Upload'),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Ảnh chỉ dùng để phân tích, sẽ không công khai.',
-                style: TextStyle(fontSize: 12),
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: onScanByCamera,
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('Quét body bằng camera'),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Ảnh chỉ dùng để phân tích, sẽ không công khai.',
-                style: TextStyle(fontSize: 12),
-              ),
-            ],
+              ],
+            ),
           ),
+
+        // =============================
+        // SectionCard preview ẢNH THẬT – CHỈ HIỆN KHI ĐÃ CHỤP ÍT NHẤT 1 ẢNH
+        // =============================
+        if (hasAny)
+          SectionCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BodyPreviewBox(
+                        label: 'Chính diện',
+                        path: frontImagePath,
+                        isDone: hasFront,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _BodyPreviewBox(
+                        label: 'Bên hông',
+                        path: sideImagePath,
+                        isDone: hasSide,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onScanByCamera,
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Quét lại dữ liệu cơ thể'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ảnh chỉ dùng để phân tích cơ thể, sẽ không công khai.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+
+        // =============================
+        // NÚT QUÉT khi chưa có ảnh (đặt ngoài SectionCard)
+        // =============================
+        if (!hasAny)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton.icon(
+                  onPressed: onScanByCamera,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('Quét dữ liệu cơ thể'),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Ảnh của bạn sẽ được bảo mật.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+
+        AppContinueButton(
+          onPressed: () {
+            if (allDone) {
+              onContinue();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Bạn cần có đủ 2 ảnh (chính diện và bên hông) trước khi tiếp tục.',
+                  ),
+                ),
+              );
+            }
+          },
         ),
-        AppContinueButton(onPressed: onContinue),
       ],
     );
   }
 }
 
+class _BodyPreviewBox extends StatelessWidget {
+  const _BodyPreviewBox({
+    required this.label,
+    required this.path,
+    required this.isDone,
+  });
+
+  final String label;
+  final String? path;
+  final bool isDone;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return AspectRatio(
+      aspectRatio: 3 / 4,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDone ? cs.primary : cs.outlineVariant,
+            width: 1.2,
+          ),
+          color: cs.surfaceVariant.withOpacity(0.15),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            if (path != null && path!.isNotEmpty)
+              Positioned.fill(child: Image.file(File(path!), fit: BoxFit.cover))
+            else
+              Center(
+                child: Icon(
+                  Icons.person_outline,
+                  size: 40,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+            Positioned(
+              left: 8,
+              bottom: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black45,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDone ? Icons.check_circle : Icons.camera_alt_outlined,
+                      size: 14,
+                      color: isDone ? Colors.greenAccent : Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// =====================
-/// STEP 3 – Sở thích & Chế độ
+/// STEP 3 – Sở thích & Chế độ (giữ logic cũ)
 /// =====================
 class DietPrefsFormCard extends StatefulWidget {
   const DietPrefsFormCard({
@@ -407,6 +795,8 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
   late Set<String> _likes;
   late Set<String> _dislikes;
   late final TextEditingController _extraCtl;
+  late final TextEditingController _cuisineCtl;
+  late final TextEditingController _allergyCtl;
 
   @override
   void initState() {
@@ -415,11 +805,15 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
     _likes = {...widget.initial.dietLikes};
     _dislikes = {...widget.initial.dietDislikes};
     _extraCtl = TextEditingController(text: widget.initial.extraFoods ?? '');
+    _cuisineCtl = TextEditingController(text: widget.initial.cuisineType ?? '');
+    _allergyCtl = TextEditingController(text: widget.initial.allergies ?? '');
   }
 
   @override
   void dispose() {
     _extraCtl.dispose();
+    _cuisineCtl.dispose();
+    _allergyCtl.dispose();
     super.dispose();
   }
 
@@ -468,18 +862,6 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Tabs Thường ăn / Không ăn được (đổi giữa likes & dislikes)
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: true, label: Text('Thường ăn')),
-                  ButtonSegment(value: false, label: Text('Không ăn được')),
-                ],
-                selected: const {true},
-                onSelectionChanged: (_) {},
-              ),
-              const SizedBox(height: 16),
-
-              // Số bữa / ngày
               Row(
                 children: [
                   const Text(
@@ -496,8 +878,22 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                 ],
               ),
               const SizedBox(height: 16),
-
-              // Chips – chọn likes
+              TextField(
+                controller: _cuisineCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Loại ẩm thực ưa thích',
+                  hintText: 'Ví dụ: Việt Nam, Nhật Bản, Địa Trung Hải...',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _allergyCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Dị ứng với thực phẩm',
+                  hintText: 'Ví dụ: Hải sản, đậu phộng...',
+                ),
+              ),
+              const SizedBox(height: 16),
               Text('Thường ăn', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               for (final entry in groups.entries) ...[
@@ -521,10 +917,7 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                 ),
                 const SizedBox(height: 12),
               ],
-
               const Divider(height: 32),
-
-              // Chips – chọn dislikes
               Text(
                 'Không ăn được',
                 style: Theme.of(context).textTheme.titleMedium,
@@ -544,13 +937,13 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                     )
                     .toList(),
               ),
-
               const SizedBox(height: 16),
               TextField(
                 controller: _extraCtl,
                 decoration: const InputDecoration(
-                  labelText: 'Thêm thực phẩm khác',
-                  hintText: 'Nhập thực phẩm khác',
+                  labelText: 'Ghi chú thêm',
+                  hintText:
+                      'Ví dụ: Thích ăn sáng nhẹ, không ăn cay, ít dầu mỡ...',
                 ),
               ),
             ],
@@ -561,11 +954,19 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
           onPressed: () {
             final draft = widget.initial
               ..mealsPerDay = _meals
+              ..cuisineType = _cuisineCtl.text.trim().isEmpty
+                  ? null
+                  : _cuisineCtl.text.trim()
+              ..allergies = _allergyCtl.text.trim().isEmpty
+                  ? null
+                  : _allergyCtl.text.trim()
               ..dietLikes = _likes
               ..dietDislikes = _dislikes
               ..extraFoods = _extraCtl.text.trim().isEmpty
                   ? null
                   : _extraCtl.text.trim();
+
+            debugPrint('[Diet] Payload gửi API: ${draft.toDietDto()}');
             widget.onSubmit(draft);
           },
         ),

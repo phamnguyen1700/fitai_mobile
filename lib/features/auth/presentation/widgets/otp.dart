@@ -13,7 +13,7 @@ class Otp extends StatefulWidget {
     super.key,
     this.onCompleted,
     this.onResend,
-    this.length = 4,
+    this.length = 6,
     this.seconds = 45,
   });
 

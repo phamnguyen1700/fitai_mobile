@@ -8,6 +8,7 @@ import '../../presentation/widgets/plan/plan_note.dart';
 import '../../presentation/widgets/food/meal_day_card.dart';
 import '../../presentation/widgets/workout/workout_day_card.dart';
 import '../../presentation/widgets/workout/exercise_video_tile.dart';
+import '../../../daily/presentation/models/meal_models.dart';
 
 class PlanPreviewBody extends StatefulWidget {
   const PlanPreviewBody({super.key});

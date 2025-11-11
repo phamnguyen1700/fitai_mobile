@@ -1,4 +1,3 @@
-// lib/features/setting/presentation/views/setting.dart
 import 'package:flutter/material.dart';
 import '../widgets/section_card.dart';
 import '../widgets/setting_tab_menu.dart';
@@ -7,6 +6,10 @@ import '../widgets/unit_group.dart';
 import '../widgets/notification_group.dart';
 import '../widgets/profile_info_card.dart';
 import '../widgets/security_card.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
+import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
+import 'package:intl/intl.dart';
 
 enum SettingTab { general, profile, notifications }
 
@@ -93,39 +96,115 @@ class _GeneralTabState extends State<_GeneralTab> {
   }
 }
 
-class _ProfileTab extends StatelessWidget {
+class _ProfileTab extends ConsumerWidget {
   const _ProfileTab();
+
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SectionCard(
-          title: 'Thông tin cá nhân',
-          child: ProfileInfoCard(
-            avatarUrl: null,
-            displayName: 'Nguyễn Văn A',
-            subtitle: 'debra.holt@example.com',
-            stats: const {
-              'Họ tên đầy đủ': 'Nguyễn Văn A',
-              'Ngày sinh': '12/08/1997',
-              'Chiều cao': '172 cm',
-              'Cân nặng': '68.5 kg',
-              'Giới tính': 'Nam',
-              'Mục tiêu': 'Giảm cân',
-            },
-            onEdit: () {},
-          ),
-        ),
-        const SizedBox(height: 12),
-        const SectionCard(
-          title: 'Mật khẩu và bảo mật',
-          child: SecurityCard(
-            email: 'daylamail@gmail.com',
-            maskedPassword: '**********',
-          ),
-        ),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authStateAsync = ref.watch(authNotifierProvider);
+
+    return authStateAsync.when(
+      loading: () => const SectionCard(
+        title: 'Thông tin cá nhân',
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, _) => SectionCard(
+        title: 'Thông tin cá nhân',
+        child: Text('Lỗi tải thông tin: $err'),
+      ),
+      data: (authState) {
+        final user = authState.user;
+        if (user == null) {
+          return const SectionCard(
+            title: 'Thông tin cá nhân',
+            child: Text('Chưa có thông tin người dùng'),
+          );
+        }
+
+        final displayName = _buildDisplayName(user);
+        final stats = _buildStats(user);
+
+        return Column(
+          children: [
+            SectionCard(
+              title: 'Thông tin cá nhân',
+              child: ProfileInfoCard(
+                avatarUrl: user.profileImage,
+                displayName: displayName,
+                subtitle: user.email,
+                stats: stats,
+                onEdit: () {
+                  // TODO: navigate sang màn chỉnh sửa profile
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SectionCard(
+              title: 'Mật khẩu và bảo mật',
+              child: SecurityCard(
+                email: user.email,
+                maskedPassword: '**********', // không có password, để mask
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  String _buildDisplayName(UserModel user) {
+    if (user.fullName != null && user.fullName!.trim().isNotEmpty) {
+      return user.fullName!;
+    }
+    final name = '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim();
+    return name.isEmpty ? 'Người dùng' : name;
+  }
+
+  Map<String, String> _buildStats(UserModel user) {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+
+    String genderLabel;
+    switch (user.gender) {
+      case Gender.M:
+        genderLabel = 'Nam';
+        break;
+      case Gender.F:
+        genderLabel = 'Nữ';
+        break;
+      default:
+        genderLabel = '-';
+    }
+
+    String goalLabel;
+    switch (user.goal) {
+      case Goal.Weight_Loss:
+        goalLabel = 'Giảm cân';
+        break;
+      case Goal.Weight_Gain:
+        goalLabel = 'Tăng cân';
+        break;
+      case Goal.Build_Muscle:
+        goalLabel = 'Tăng cơ';
+        break;
+      case Goal.Maintain_Weight:
+      default:
+        goalLabel = 'Duy trì cân nặng';
+    }
+
+    return {
+      'Họ tên đầy đủ': _buildDisplayName(user),
+      'Ngày sinh': user.dateOfBirth != null
+          ? dateFormat.format(user.dateOfBirth!.toLocal())
+          : '-',
+      'Chiều cao': user.height != null
+          ? '${user.height!.toStringAsFixed(0)} cm'
+          : '-',
+      'Cân nặng': user.weight != null
+          ? '${user.weight!.toStringAsFixed(1)} kg'
+          : '-',
+      'Giới tính': genderLabel,
+      'Mục tiêu': goalLabel,
+    };
   }
 }
 

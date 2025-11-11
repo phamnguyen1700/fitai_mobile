@@ -64,8 +64,7 @@ class _BottomNavBar extends StatelessWidget {
 
   static const _tabs = [
     ('/home', 'Trang chủ', AppIcons.homeOutline, AppIcons.home),
-    ('/workout', 'Bài tập', AppIcons.workoutOutline, AppIcons.workout),
-    ('/meal', 'Thực đơn', AppIcons.mealOutline, AppIcons.meal),
+    ('/daily', 'Kế hoạch', AppIcons.workoutOutline, AppIcons.workout),
     ('/progress', 'Tiến độ', AppIcons.progressOutline, AppIcons.progress),
     ('/profile', 'Hồ sơ', AppIcons.profileOutline, AppIcons.profile),
   ];

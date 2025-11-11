@@ -47,5 +47,9 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>NSCameraUsageDescription</key>
+		<string>Ứng dụng cần dùng camera để chụp ảnh cơ thể.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Ứng dụng cần truy cập thư viện ảnh để chọn hình từ máy.</string>
 	</dict>
 </plist>
