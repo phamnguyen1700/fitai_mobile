@@ -20,6 +20,7 @@ class AppTextField extends StatefulWidget {
     this.onChanged,
     this.validator,
     this.onSubmitted,
+    this.textAlign,
   });
 
   final TextEditingController? controller;
@@ -39,6 +40,7 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onSubmitted;
+  final TextAlign? textAlign;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -69,6 +71,7 @@ class _AppTextFieldState extends State<AppTextField> {
       onChanged: widget.onChanged,
       validator: widget.validator,
       onFieldSubmitted: widget.onSubmitted,
+      textAlign: widget.textAlign ?? TextAlign.start,
       decoration:
           InputDecoration(
             labelText: widget.label,

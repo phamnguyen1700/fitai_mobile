@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'color_scheme.dart';
-import './app_button_theme.dart';
+import 'package:flutter/services.dart';
+import '../color/color_scheme.dart';
+import 'app_button_theme.dart';
 import 'app_tab_theme.dart';
+import 'header_theme.dart';
 
 class AppTheme {
   // Public: dùng thẳng 2 biến này trong MaterialApp
@@ -9,13 +11,28 @@ class AppTheme {
   static final ThemeData darkTheme = _buildTheme(AppColorSchemes.dark);
 
   static ThemeData _buildTheme(ColorScheme cs, {String? fontFamily}) {
+    Color scaffoldBg(ColorScheme cs) => cs.brightness == Brightness.dark
+        ? const Color.fromARGB(255, 36, 36, 36) // DARK FIXED
+        : const Color.fromARGB(255, 228, 228, 228); // LIGHT FIXED
+
+    Color barBg(ColorScheme cs) => cs.brightness == Brightness.dark
+        ? Colors
+              .black // = AppBar dark
+        : Colors.white; // = AppBar light
+
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs,
+      extensions: [
+        AppHeaderTheme(
+          backdropColor: barBg(cs).withOpacity(0.35),
+          blurSigma: 12,
+        ),
+      ],
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: cs.surface,
-        surfaceTintColor: cs.surfaceTint,
-        modalBackgroundColor: cs.surface,
+        backgroundColor: barBg(cs),
+        modalBackgroundColor: barBg(cs),
+        surfaceTintColor: Colors.transparent,
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         elevation: 1,
         modalElevation: 2,
@@ -26,18 +43,23 @@ class AppTheme {
       ),
       fontFamily: fontFamily,
       visualDensity: VisualDensity.standard,
-      scaffoldBackgroundColor: cs.surface,
+      scaffoldBackgroundColor: scaffoldBg(cs),
       // === AppBar ===
       appBarTheme: AppBarTheme(
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
         centerTitle: true,
+        shadowColor: Colors.transparent,
+        iconTheme: IconThemeData(color: cs.onSurface),
         titleTextStyle: TextStyle(
           color: cs.onSurface,
           fontWeight: FontWeight.w600,
           fontSize: 18,
         ),
+        systemOverlayStyle: cs.brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       // === Card ===
       cardTheme: CardThemeData(
@@ -84,7 +106,7 @@ class AppTheme {
 
       // === Bottom Navigation (Material2) ===
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: cs.surface,
+        backgroundColor: barBg(cs),
         selectedItemColor: cs.primary,
         unselectedItemColor: cs.onSurfaceVariant,
         type: BottomNavigationBarType.fixed,
@@ -95,25 +117,24 @@ class AppTheme {
 
       // === NavigationBar (Material3) ===
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: cs.surface,
-        indicatorColor: cs.primaryContainer,
+        backgroundColor: barBg(cs), // đồng bộ surface
+        elevation: 0,
+        indicatorColor: Colors.transparent, // theo mockup: không pill
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
-          final color = states.contains(WidgetState.selected)
-              ? cs.onPrimaryContainer
-              : cs.onSurfaceVariant;
-          return IconThemeData(color: color);
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(color: selected ? cs.primary : cs.outline);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
-          final color = states.contains(WidgetState.selected)
-              ? cs.onSurface
-              : cs.onSurfaceVariant;
-          return TextStyle(fontWeight: FontWeight.w600, color: color);
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            color: selected ? cs.primary : cs.outline,
+          );
         }),
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        height: 64,
       ),
-
+      dividerColor: cs.outlineVariant, // dùng thống nhất cho viền
       // === Chip ===
       chipTheme: ChipThemeData(
         backgroundColor: cs.surfaceContainerHighest,

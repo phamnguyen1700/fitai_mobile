@@ -12,15 +12,15 @@ class AppBottomSheet {
     required WidgetBuilder builder,
     bool isScrollControlled = true,
     bool enableDrag = true,
-    bool useSafeArea = true,
+    bool useSafeArea = false,
     double? maxWidth = 720, // null = không giới hạn
   }) {
     final bs = Theme.of(context).bottomSheetTheme;
 
     return showModalBottomSheet<T>(
       context: context,
-      useSafeArea: useSafeArea,
-      isScrollControlled: isScrollControlled,
+      useSafeArea: false,
+      isScrollControlled: true,
       enableDrag: enableDrag,
       showDragHandle: false,
       backgroundColor: bs.modalBackgroundColor ?? bs.backgroundColor,
@@ -56,7 +56,7 @@ class AppBottomSheet {
   }) {
     return show<T>(
       context,
-      useSafeArea: useSafeArea,
+      useSafeArea: false,
       isScrollControlled: true,
       maxWidth: maxWidth,
       builder: (ctx) {

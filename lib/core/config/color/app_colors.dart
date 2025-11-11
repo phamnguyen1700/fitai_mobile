@@ -30,7 +30,7 @@ class AppColors {
 
   // === Outline / Divider ===
   static const Color outline = Color(0xFFDDDDDD);
-  static const Color outlineVariant = Color(0xFFECECEC);
+  static const Color outlineVariant = Color.fromARGB(255, 255, 250, 250);
   static const Color shadow = Color(0x19000000); // 10% đen
 
   // === Status ===
