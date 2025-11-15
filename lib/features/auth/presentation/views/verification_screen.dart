@@ -40,14 +40,13 @@ class VerificationScreen extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: ConstrainedBox(
-                        // ✅ ép chiều cao tối thiểu bằng viewport để Center hoạt động
                         constraints: BoxConstraints(
                           minHeight: constraints.maxHeight,
                         ),
                         child: Center(
                           child: AppCard(
                             color: Theme.of(context).colorScheme.surface,
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(12),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [

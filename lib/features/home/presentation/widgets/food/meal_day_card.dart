@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../daily/presentation/models/meal_models.dart'; // <-- model chung
+import '../../../../daily/data/models/meal_models.dart'; // <-- model chung
 import 'meal_item_tile.dart';
 
 class MealDayCard extends StatelessWidget {

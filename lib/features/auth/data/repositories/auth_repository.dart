@@ -11,7 +11,7 @@ import 'package:dio/dio.dart';
 
 class AuthRepository {
   final AuthApiService _authApiService = AuthApiService();
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient = ApiClient.account();
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   // Login with email and password

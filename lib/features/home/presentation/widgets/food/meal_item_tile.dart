@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../daily/presentation/models/meal_models.dart';
+import '../../../../daily/data/models/meal_models.dart';
 
 class MealGroupTile extends StatelessWidget {
   final MealGroup group;

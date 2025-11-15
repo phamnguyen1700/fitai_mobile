@@ -1,21 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// AppButton — nút M3 tuỳ biến theo design:
-/// - Variant: filled / tonal / outlined / text
-/// - Size: xs / sm / md / lg   (md = 44dp chuẩn Material)
-/// - Shape: rounded (bo 12) / pill (viên thuốc)
-/// - Full width: block button (dạng thanh toán / CTA lớn)
-/// - Icon trái/phải, loading state
-///
-/// Ví dụ dùng:
-/// AppButton(label: 'Primary', onPressed: () {});
-/// AppButton(label: 'Primary', variant: AppButtonVariant.tonal);
-/// AppButton(label: 'Primary', variant: AppButtonVariant.outlined, shape: AppButtonShape.pill);
-/// AppButton(label: 'Primary', size: AppButtonSize.xs, fullWidth: false);
-/// AppButton(label: 'Đang xử lý', isLoading: true);
-///
-/// Gợi ý: Vẫn giữ theme-level cho Button trong AppTheme (AppButtonThemes) để nút core M3 đồng bộ.
-
 enum AppButtonVariant { filled, tonal, outlined, text }
 
 enum AppButtonSize { xs, sm, md, lg }
@@ -52,13 +36,16 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dims = _Dims.of(size);
+    final dims = _Dims.of(context, size);
     final cs = Theme.of(context).colorScheme;
 
     // Child (text + optional icon or spinner)
     final baseText = Text(
       label,
-      style: TextStyle(fontWeight: FontWeight.w600, fontSize: dims.font),
+      style: TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: dims.font, // font vẫn để bình thường, textScaler global lo
+      ),
     );
 
     Widget inner;
@@ -109,7 +96,7 @@ class AppButton extends StatelessWidget {
         break;
     }
 
-    // Disabled/pressed màu theo M3 (gần với ảnh bạn gửi)
+    // Disabled/pressed màu theo M3
     final bgDisabled = cs.onSurface.withValues(alpha: 0.12);
     final fgDisabled = cs.onSurface.withValues(alpha: 0.38);
 
@@ -265,10 +252,39 @@ class _Dims {
     required this.hPadText,
   });
 
-  static _Dims of(AppButtonSize s) {
+  _Dims scale(double f) {
+    if (f == 1.0) return this;
+    return _Dims(
+      height: height * f,
+      minWidth: minWidth * f,
+      hPad: hPad * f,
+      font: font, // font không scale thêm, textScaler global đã lo
+      icon: icon * f,
+      spinner: spinner * f,
+      gap: gap * f,
+      heightText: heightText * f,
+      minWidthText: minWidthText * f,
+      hPadText: hPadText * f,
+    );
+  }
+
+  static _Dims of(BuildContext context, AppButtonSize s) {
+    final size = MediaQuery.sizeOf(context);
+    final shortest = size.shortestSide;
+
+    double factor;
+    if (shortest < 340) {
+      factor = 0.85; // rất hẹp
+    } else if (shortest < 380) {
+      factor = 0.9; // hơi hẹp
+    } else {
+      factor = 1.0; // bình thường trở lên
+    }
+
+    _Dims base;
     switch (s) {
       case AppButtonSize.xs:
-        return const _Dims(
+        base = const _Dims(
           height: 28,
           minWidth: 56,
           hPad: 10,
@@ -280,8 +296,9 @@ class _Dims {
           minWidthText: 40,
           hPadText: 6,
         );
+        break;
       case AppButtonSize.sm:
-        return const _Dims(
+        base = const _Dims(
           height: 36,
           minWidth: 64,
           hPad: 12,
@@ -293,8 +310,9 @@ class _Dims {
           minWidthText: 48,
           hPadText: 8,
         );
+        break;
       case AppButtonSize.lg:
-        return const _Dims(
+        base = const _Dims(
           height: 52,
           minWidth: 72,
           hPad: 16,
@@ -306,8 +324,9 @@ class _Dims {
           minWidthText: 56,
           hPadText: 10,
         );
+        break;
       case AppButtonSize.md:
-        return const _Dims(
+        base = const _Dims(
           height: 44,
           minWidth: 64,
           hPad: 14,
@@ -319,6 +338,9 @@ class _Dims {
           minWidthText: 52,
           hPadText: 8,
         );
+        break;
     }
+
+    return base.scale(factor);
   }
 }

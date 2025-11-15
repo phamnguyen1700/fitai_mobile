@@ -34,62 +34,30 @@ class SetupDietStep extends ConsumerWidget {
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: SetupContainer(
-                child: DietPrefsFormCard(
-                  initial: draft,
-                  onSubmit: (d) async {
-                    // 1️⃣ Cập nhật local draft
-                    ref.read(profileDraftProvider.notifier).state = d;
-
-                    // 2️⃣ Map ProfileDraft → DTO
-                    String? _firstOrNull(Set<String> set) =>
-                        set.isEmpty ? null : set.first;
-
-                    final req = DietaryPreferenceRequest(
-                      mealsPerDay: d.mealsPerDay,
-                      cuisineType: null,
-                      allergies: null,
-                      avoidIngredients: _firstOrNull(d.dietDislikes),
-                      preferredIngredients: _firstOrNull(d.dietLikes),
-                      notes: d.extraFoods,
+            child: DietPrefsFormCard(
+              initial: draft, // vẫn giữ để prefill
+              onSubmit: (req) async {
+                // ✅ nhận DietaryPreferenceRequest
+                try {
+                  await ref.read(dietaryPreferenceRepositoryProvider).save(req);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lưu khẩu phần ăn thành công!'),
+                      ),
                     );
-
-                    try {
-                      // 3️⃣ Gọi repo thông qua Riverpod (codegen)
-                      await ref
-                          .read(dietaryPreferenceRepositoryProvider)
-                          .save(req);
-
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Lưu khẩu phần ăn thành công!'),
-                          ),
-                        );
-                        context.go('/home');
-                      }
-                    } catch (e, st) {
-                      debugPrint('[Diet] error: $e\n$st');
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Có lỗi khi lưu khẩu phần ăn, vui lòng thử lại.',
-                          ),
-                        ),
-                      );
-                    }
-
-                    // 4️⃣ Log debug
-                    final after = GoRouter.of(
-                      context,
-                    ).routeInformationProvider.value.location;
-                    debugPrint('[Diet] SUBMIT after go -> $after');
-                  },
-                ),
-              ),
+                    context.go('/home');
+                  }
+                } catch (e, st) {
+                  debugPrint('[Diet] error: $e\n$st');
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Có lỗi khi lưu khẩu phần ăn.'),
+                    ),
+                  );
+                }
+              },
             ),
           ),
         ),

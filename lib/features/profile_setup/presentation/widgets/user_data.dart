@@ -1,3 +1,4 @@
+import 'package:fitai_mobile/features/profile_setup/data/models/dietary_preference_request.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
@@ -24,8 +25,8 @@ class ProfileDraft {
 
   // Diet fields
   int mealsPerDay;
-  Set<String> dietLikes;
-  Set<String> dietDislikes;
+  Set<String> preferredIngredients;
+  Set<String> avoidIngredients;
   String? extraFoods;
   String? cuisineType;
   String? allergies;
@@ -43,13 +44,13 @@ class ProfileDraft {
     this.frontBodyPhotoPath,
     this.sideBodyPhotoPath,
     this.mealsPerDay = 3,
-    Set<String>? dietLikes,
-    Set<String>? dietDislikes,
+    Set<String>? preferredIngredients,
+    Set<String>? avoidIngredients,
     this.extraFoods,
     this.cuisineType,
     this.allergies,
-  }) : dietLikes = dietLikes ?? {},
-       dietDislikes = dietDislikes ?? {};
+  }) : preferredIngredients = preferredIngredients ?? {},
+       avoidIngredients = avoidIngredients ?? {};
 
   factory ProfileDraft.fromUser(UserModel user) => ProfileDraft(
     firstName: user.firstName,
@@ -68,9 +69,11 @@ extension ProfileDraftDietDto on ProfileDraft {
     'mealsPerDay': mealsPerDay,
     'cuisineType': cuisineType,
     'allergies': allergies,
-    'preferredIngredients': dietLikes.isNotEmpty ? dietLikes.join(', ') : null,
-    'avoidIngredients': dietDislikes.isNotEmpty
-        ? dietDislikes.join(', ')
+    'preferredIngredients': preferredIngredients.isNotEmpty
+        ? preferredIngredients.join(', ')
+        : null,
+    'avoidIngredients': avoidIngredients.isNotEmpty
+        ? avoidIngredients.join(', ')
         : null,
     'notes': extraFoods,
   }..removeWhere((_, v) => v == null);
@@ -784,7 +787,7 @@ class DietPrefsFormCard extends StatefulWidget {
   });
 
   final ProfileDraft initial;
-  final ValueChanged<ProfileDraft> onSubmit;
+  final ValueChanged<DietaryPreferenceRequest> onSubmit;
 
   @override
   State<DietPrefsFormCard> createState() => _DietPrefsFormCardState();
@@ -792,21 +795,42 @@ class DietPrefsFormCard extends StatefulWidget {
 
 class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
   late int _meals;
-  late Set<String> _likes;
-  late Set<String> _dislikes;
+  final Set<String> _preferred = {};
+
   late final TextEditingController _extraCtl;
   late final TextEditingController _cuisineCtl;
   late final TextEditingController _allergyCtl;
+  late final TextEditingController _proteinCtl;
+  late final TextEditingController _carbCtl;
+  late final TextEditingController _fatCtl;
+  late final TextEditingController _fiberCtl;
+  late final TextEditingController _avoidCtl;
+
+  final List<String> _customProteins = [];
+  final List<String> _customCarbs = [];
+  final List<String> _customFats = [];
+  final List<String> _customFibers = [];
 
   @override
   void initState() {
     super.initState();
     _meals = widget.initial.mealsPerDay;
-    _likes = {...widget.initial.dietLikes};
-    _dislikes = {...widget.initial.dietDislikes};
+
+    // Nếu draft cũ có preferredIngredients -> parse ra _preferred
+    _preferred.addAll(widget.initial.preferredIngredients);
+
     _extraCtl = TextEditingController(text: widget.initial.extraFoods ?? '');
     _cuisineCtl = TextEditingController(text: widget.initial.cuisineType ?? '');
     _allergyCtl = TextEditingController(text: widget.initial.allergies ?? '');
+
+    _avoidCtl = TextEditingController(
+      text: widget.initial.avoidIngredients.join(', '),
+    );
+
+    _proteinCtl = TextEditingController();
+    _carbCtl = TextEditingController();
+    _fatCtl = TextEditingController();
+    _fiberCtl = TextEditingController();
   }
 
   @override
@@ -814,54 +838,145 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
     _extraCtl.dispose();
     _cuisineCtl.dispose();
     _allergyCtl.dispose();
+    _avoidCtl.dispose();
+    _proteinCtl.dispose();
+    _carbCtl.dispose();
+    _fatCtl.dispose();
+    _fiberCtl.dispose();
     super.dispose();
   }
 
-  void _toggle(Set<String> set, String item) {
-    set.contains(item) ? set.remove(item) : set.add(item);
+  Set<String> _parseFreeTextToSet(String s) => s
+      .split(RegExp(r'[,\n;]+'))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toSet();
+
+  void _togglePreferred(String item) {
+    if (_preferred.contains(item)) {
+      _preferred.remove(item);
+    } else {
+      _preferred.add(item);
+    }
     setState(() {});
+  }
+
+  void _commitCustom(TextEditingController ctl, List<String> bucket) {
+    final items = _parseFreeTextToSet(ctl.text);
+    if (items.isEmpty) return;
+
+    bool changed = false;
+    for (final p in items) {
+      if (!bucket.contains(p)) bucket.add(p);
+      if (_preferred.add(p)) changed = true;
+    }
+    if (changed) setState(() {});
+    ctl.clear();
+  }
+
+  void _onTypeCommit(String v, TextEditingController ctl, List<String> bucket) {
+    if (v.endsWith(',') || v.endsWith(';') || v.endsWith('\n')) {
+      _commitCustom(ctl, bucket);
+    }
+  }
+
+  Widget _underlinedInput({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    required List<String> targetBucket,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: SizedBox(
+        width: double.infinity, // ✅ chiếm toàn bộ chiều ngang
+        child: TextField(
+          controller: controller,
+          textInputAction: TextInputAction.done,
+          style: const TextStyle(fontSize: 13),
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint,
+            border: const UnderlineInputBorder(),
+            isDense: true,
+            contentPadding: const EdgeInsets.symmetric(
+              vertical: 8,
+              horizontal: 4,
+            ),
+            labelStyle: const TextStyle(fontSize: 13),
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+          onChanged: (v) => _onTypeCommit(v, controller, targetBucket),
+          onSubmitted: (_) => _commitCustom(controller, targetBucket),
+          onEditingComplete: () => _commitCustom(controller, targetBucket),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final groups = <String, List<String>>{
-      'Rau / Củ / Quả': [
-        'Rau xanh',
-        'Cà rốt',
-        'Khoai lang',
-        'Táo',
-        'Chuối',
-        'Cam',
-      ],
-      'Đậu / Ngũ cốc': [
-        'Gạo',
-        'Yến mạch',
-        'Đậu nành',
-        'Đậu xanh',
-        'Đậu đỏ',
-        'Hạt chia',
-      ],
-      'Thịt / Cá / Hải sản': [
-        'Thịt gà',
-        'Thịt bò',
-        'Thịt heo',
-        'Cá hồi',
-        'Cá ngừ',
-        'Tôm',
-      ],
+    final proteinList = <String>[
+      'Thịt gà', 'Thịt bò', 'Thịt heo', 'Cá hồi', 'Cá ngừ', 'Tôm', 'Trứng',
+      'Đậu giàu protein', // đổi từ "Đậu nành" -> mô tả đúng hơn
+    ];
+
+    final carbList = <String>[
+      'Gạo',
+      'Yến mạch',
+      'Khoai lang',
+      'Bánh mì nguyên cám',
+      'Chuối',
+      'Dưa hấu',
+      'Đậu giàu tinh bột',
+    ];
+
+    final fatList = <String>[
+      'Đậu giàu chất béo',
+      'Dầu ô liu',
+      'Hạt óc chó',
+      'Hạnh nhân',
+      'Bơ (avocado)',
+    ];
+
+    final fiberList = <String>[
+      'Rau lá xanh',
+      'Bông cải xanh',
+      'Dưa leo',
+      'Bí ngòi',
+      'Măng tây',
+      'Cà rốt',
+      'Rau trộn',
+    ];
+
+    final allItems = <String>{
+      ...proteinList,
+      ...carbList,
+      ...fatList,
+      ...fiberList,
+      ..._customProteins,
+      ..._customCarbs,
+      ..._customFats,
+      ..._customFibers,
     };
+    final dietOptions = ['Bình thường', 'Chay', 'Keto'];
+
+    String? joinOrNull(Set<String> s) {
+      final xs = s.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      return xs.isEmpty ? null : xs.join(', ');
+    }
 
     return Column(
       children: [
-        const StepHeader(
-          title: 'Sở thích & chế độ ăn',
-          subtitle: 'Giúp AI xây thực đơn phù hợp.',
-          current: 3,
-        ),
         SectionCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              const StepHeader(
+                title: 'Sở thích & chế độ ăn',
+                subtitle: 'Giúp AI xây thực đơn phù hợp.',
+                current: 3,
+              ),
               Row(
                 children: [
                   const Text(
@@ -871,79 +986,185 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                   const Spacer(),
                   _Stepper(
                     value: _meals,
-                    min: 2,
-                    max: 6,
+                    min: 3,
+                    max: 5,
                     onChanged: (v) => setState(() => _meals = v),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _cuisineCtl,
-                decoration: const InputDecoration(
-                  labelText: 'Loại ẩm thực ưa thích',
-                  hintText: 'Ví dụ: Việt Nam, Nhật Bản, Địa Trung Hải...',
-                ),
+              const SizedBox(height: 8),
+              Text('Chế độ ăn', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 4,
+                children: dietOptions.map((option) {
+                  final selected = _cuisineCtl.text == option;
+                  return ChoiceChip(
+                    label: Text(option),
+                    selected: selected,
+                    onSelected: (_) =>
+                        setState(() => _cuisineCtl.text = option),
+                  );
+                }).toList(),
               ),
-              const SizedBox(height: 12),
+
+              const SizedBox(height: 4),
               TextField(
                 controller: _allergyCtl,
                 decoration: const InputDecoration(
                   labelText: 'Dị ứng với thực phẩm',
                   hintText: 'Ví dụ: Hải sản, đậu phộng...',
+                  border: UnderlineInputBorder(), // ✅ thêm underline
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text('Thường ăn', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
-              for (final entry in groups.entries) ...[
-                Text(
-                  entry.key,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: entry.value
-                      .map(
-                        (e) => FilterChip(
-                          selected: _likes.contains(e),
-                          label: Text(e),
-                          onSelected: (_) => _toggle(_likes, e),
-                        ),
-                      )
-                      .toList(),
-                ),
-                const SizedBox(height: 12),
-              ],
-              const Divider(height: 32),
+
+              // ===== Nguồn đạm =====
+              const Text(
+                'Nguồn đạm',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 1,
+                children: <String>[...proteinList, ..._customProteins]
+                    .map(
+                      (e) => FilterChip(
+                        selected: _preferred.contains(e),
+                        label: Text(e),
+                        onSelected: (_) => _togglePreferred(e),
+                      ),
+                    )
+                    .toList(),
+              ),
+              _underlinedInput(
+                label: 'Đạm khác',
+                hint: 'Ví dụ: Thịt vịt, cá trê...',
+                controller: _proteinCtl,
+                targetBucket: _customProteins,
+              ),
+
+              const SizedBox(height: 8),
+
+              // ===== Nguồn tinh bột =====
+              const Text(
+                'Nguồn tinh bột',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 1,
+                children: <String>[...carbList, ..._customCarbs]
+                    .map(
+                      (e) => FilterChip(
+                        selected: _preferred.contains(e),
+                        label: Text(e),
+                        onSelected: (_) => _togglePreferred(e),
+                      ),
+                    )
+                    .toList(),
+              ),
+              _underlinedInput(
+                label: 'Tinh bột khác',
+                hint: 'Ví dụ: Lúa mạch đen, khoai tây...',
+                controller: _carbCtl,
+                targetBucket: _customCarbs,
+              ),
+              const SizedBox(height: 8),
+
+              // ===== Chất béo =====
+              const Text(
+                'Chất béo',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 1,
+                children: <String>[...fatList, ..._customFats]
+                    .map(
+                      (e) => FilterChip(
+                        selected: _preferred.contains(e),
+                        label: Text(e),
+                        onSelected: (_) => _togglePreferred(e),
+                      ),
+                    )
+                    .toList(),
+              ),
+              _underlinedInput(
+                label: 'Chất béo khác',
+                hint: 'Ví dụ: Dầu mè, hạt điều...',
+                controller: _fatCtl,
+                targetBucket: _customFats,
+              ),
+              const SizedBox(height: 8),
+
+              // ===== Chất xơ =====
+              const Text(
+                'Chất xơ',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 4,
+                runSpacing: 1,
+                children: <String>[...fiberList, ..._customFibers]
+                    .map(
+                      (e) => FilterChip(
+                        selected: _preferred.contains(e),
+                        label: Text(e),
+                        onSelected: (_) => _togglePreferred(e),
+                      ),
+                    )
+                    .toList(),
+              ),
+              _underlinedInput(
+                label: 'Chất xơ khác',
+                hint: 'Ví dụ: Cải xoăn, bắp cải thảo...',
+                controller: _fiberCtl,
+                targetBucket: _customFibers,
+              ),
+              const Divider(height: 8),
               Text(
                 'Không ăn được',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: groups.values
-                    .expand((x) => x)
-                    .map(
-                      (e) => FilterChip(
-                        selected: _dislikes.contains(e),
-                        label: Text(e),
-                        onSelected: (_) => _toggle(_dislikes, e),
-                      ),
-                    )
-                    .toList(),
+              TextField(
+                controller: _avoidCtl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Không ăn được',
+                  hintText: 'Ví dụ: Tôm, đậu phộng, hành...',
+                  border: UnderlineInputBorder(), // ✅ dùng cùng style
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
+                ),
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(height: 8),
               TextField(
                 controller: _extraCtl,
                 decoration: const InputDecoration(
                   labelText: 'Ghi chú thêm',
                   hintText:
                       'Ví dụ: Thích ăn sáng nhẹ, không ăn cay, ít dầu mỡ...',
+                  border: UnderlineInputBorder(), // ✅ đồng nhất
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 4,
+                  ),
                 ),
               ),
             ],
@@ -952,22 +1173,23 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
         AppContinueButton(
           label: 'Hoàn tất hồ sơ',
           onPressed: () {
-            final draft = widget.initial
-              ..mealsPerDay = _meals
-              ..cuisineType = _cuisineCtl.text.trim().isEmpty
+            final req = DietaryPreferenceRequest(
+              mealsPerDay: _meals,
+              cuisineType: _cuisineCtl.text.trim().isEmpty
                   ? null
-                  : _cuisineCtl.text.trim()
-              ..allergies = _allergyCtl.text.trim().isEmpty
+                  : _cuisineCtl.text.trim(),
+              allergies: _allergyCtl.text.trim().isEmpty
                   ? null
-                  : _allergyCtl.text.trim()
-              ..dietLikes = _likes
-              ..dietDislikes = _dislikes
-              ..extraFoods = _extraCtl.text.trim().isEmpty
+                  : _allergyCtl.text.trim(),
+              preferredIngredients: joinOrNull(_preferred),
+              avoidIngredients: joinOrNull(_parseFreeTextToSet(_avoidCtl.text)),
+              notes: _extraCtl.text.trim().isEmpty
                   ? null
-                  : _extraCtl.text.trim();
+                  : _extraCtl.text.trim(),
+            );
 
-            debugPrint('[Diet] Payload gửi API: ${draft.toDietDto()}');
-            widget.onSubmit(draft);
+            debugPrint('[Diet] Request: ${req.toJson()}');
+            widget.onSubmit(req); // ✅ trả thẳng request
           },
         ),
       ],

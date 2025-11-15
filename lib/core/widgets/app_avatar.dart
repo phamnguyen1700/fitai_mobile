@@ -18,18 +18,25 @@ class AppAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
     final initials = (name?.trim().isNotEmpty ?? false)
         ? name!.trim()[0].toUpperCase()
         : 'U';
 
-    final avatar = imageUrl == null || imageUrl!.isEmpty
+    // 🌫️ Nền xám đục giống AppBar / BottomNav (không blur, chỉ màu)
+    final glassBaseColor = Color.alphaBlend(
+      const Color.fromARGB(31, 128, 128, 128),
+      cs.surface.withOpacity(0.5),
+    );
+
+    final avatar = (imageUrl == null || imageUrl!.isEmpty)
         ? CircleAvatar(
             radius: size / 2,
-            backgroundColor: cs.secondaryContainer,
+            backgroundColor: glassBaseColor,
             child: Text(
               initials,
               style: TextStyle(
-                color: cs.onSecondaryContainer,
+                color: cs.onSurface,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -37,7 +44,7 @@ class AppAvatar extends StatelessWidget {
         : CircleAvatar(
             radius: size / 2,
             backgroundImage: NetworkImage(imageUrl!),
-            backgroundColor: cs.surfaceContainerHighest,
+            backgroundColor: glassBaseColor,
           );
 
     if (!showRing) return avatar;

@@ -1,6 +1,6 @@
+// lib/features/home/presentation/widgets/workout/today_workout_plan.dart
 import 'package:flutter/material.dart';
-import '../models/workout_models.dart';
-import 'package:fitai_mobile/features/home/presentation/widgets/workout/exercise_video_tile.dart';
+import '../../data/models/workout_plan_block.dart';
 
 class TodayWorkoutPlan extends StatefulWidget {
   const TodayWorkoutPlan({
@@ -46,6 +46,7 @@ class _TodayWorkoutPlanState extends State<TodayWorkoutPlan> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // tiêu đề + checkbox
               Row(
                 children: [
                   Checkbox(
@@ -68,26 +69,52 @@ class _TodayWorkoutPlanState extends State<TodayWorkoutPlan> {
                 ],
               ),
               const SizedBox(height: 4),
+
+              // stats
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [Text(b.leftStat), Text(b.rightStat)],
               ),
               const SizedBox(height: 6),
+
               Text(
                 '${b.calories} Calo',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 6),
+
+              // progress bar
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
-                  value: b.progress.clamp(0, 1),
+                  value: b.progress.clamp(0, 1).toDouble(),
                   minHeight: 8,
                   backgroundColor: cs.surfaceVariant,
                 ),
               ),
               const SizedBox(height: 10),
-              ExerciseVideoTile(title: b.videoTitle, thumbUrl: b.videoThumb),
+
+              // 🔹 TẠM THỜI: chỉ hiển thị thumbnail, chưa play video
+              if (b.videoThumb.isNotEmpty)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(b.videoThumb, fit: BoxFit.cover),
+                        const Center(
+                          child: Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.white,
+                            size: 56,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         );

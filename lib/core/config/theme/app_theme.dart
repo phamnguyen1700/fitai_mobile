@@ -11,23 +11,25 @@ class AppTheme {
   static final ThemeData darkTheme = _buildTheme(AppColorSchemes.dark);
 
   static ThemeData _buildTheme(ColorScheme cs, {String? fontFamily}) {
-    Color scaffoldBg(ColorScheme cs) => cs.brightness == Brightness.dark
+    Color barBg(ColorScheme cs) => cs.brightness == Brightness.dark
         ? const Color.fromARGB(255, 36, 36, 36) // DARK FIXED
         : const Color.fromARGB(255, 228, 228, 228); // LIGHT FIXED
 
-    Color barBg(ColorScheme cs) => cs.brightness == Brightness.dark
+    Color scaffoldBg(ColorScheme cs) => cs.brightness == Brightness.dark
         ? Colors
               .black // = AppBar dark
         : Colors.white; // = AppBar light
+
+    Color glassBarBg(ColorScheme cs) => Color.alphaBlend(
+      const Color.fromARGB(31, 128, 128, 128), // xám nhạt phủ lên
+      barBg(cs).withOpacity(0.5), // độ trong suốt thấp
+    );
 
     final base = ThemeData(
       useMaterial3: true,
       colorScheme: cs,
       extensions: [
-        AppHeaderTheme(
-          backdropColor: barBg(cs).withOpacity(0.35),
-          blurSigma: 12,
-        ),
+        AppHeaderTheme(backdropColor: glassBarBg(cs), blurSigma: 12),
       ],
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: barBg(cs),

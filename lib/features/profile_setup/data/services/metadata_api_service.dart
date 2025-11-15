@@ -5,7 +5,7 @@ import 'package:fitai_mobile/core/api/api_constants.dart';
 import '../models/activity_level_metadata.dart';
 
 class MetadataApiService {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient = ApiClient.account();
 
   Future<List<ActivityLevelMetadata>> getActivityLevels() async {
     try {

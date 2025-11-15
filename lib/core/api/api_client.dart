@@ -1,24 +1,51 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+
 import 'api_constants.dart';
+import 'api_config.dart';
 
 class ApiClient {
   late final Dio _dio;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
-  static ApiClient? _instance;
+  // ==========================
+  // Singleton cho từng service
+  // ==========================
+  static ApiClient? _accountInstance;
+  static ApiClient? _fitnessInstance;
+  static ApiClient? _chatInstance;
 
-  // Singleton pattern
-  factory ApiClient() {
-    _instance ??= ApiClient._internal();
-    return _instance!;
+  /// 👤 Client cho AccountService (port 8081)
+  factory ApiClient.account() {
+    _accountInstance ??= ApiClient._internal(ApiConfig.accountFullBaseUrl);
+    return _accountInstance!;
   }
 
-  ApiClient._internal() {
+  /// 🏋️ Client cho FitnessService (port 8082)
+  factory ApiClient.fitness() {
+    _fitnessInstance ??= ApiClient._internal(ApiConfig.fitnessFullBaseUrl);
+    return _fitnessInstance!;
+  }
+
+  factory ApiClient.chat() {
+    // baseUrl = http://54.179.34.55:8082
+    _chatInstance ??= ApiClient._internal(ApiConfig.fitnessBaseUrl);
+    return _chatInstance!;
+  }
+
+  /// Giữ lại factory cũ cho đỡ vỡ code,
+  /// nhưng nên dần dần replace bằng `.account()` hoặc `.fitness()`.
+  @Deprecated('Use ApiClient.account() or ApiClient.fitness() instead')
+  factory ApiClient() {
+    return ApiClient.account();
+  }
+
+  // baseUrl được truyền vào để tái sử dụng logic chung
+  ApiClient._internal(String baseUrl) {
     _dio = Dio(
       BaseOptions(
-        baseUrl: ApiConstants.fullBaseUrl,
+        baseUrl: baseUrl,
         connectTimeout: ApiConstants.connectTimeout,
         receiveTimeout: ApiConstants.receiveTimeout,
         sendTimeout: ApiConstants.sendTimeout,
@@ -51,76 +78,31 @@ class ApiClient {
           handler.next(response);
         },
         onError: (error, handler) async {
-          // Handle token refresh on 401 errors
+          // Handle token refresh on 401 errors (tạm tắt)
           if (error.response?.statusCode == 401) {
-            // final refreshed = await _refreshToken();
-            // if (refreshed) {
-            //   // Retry the request with new token
-            //   final newRequest = await _dio.fetch(error.requestOptions);
-            //   handler.resolve(newRequest);
-            //   return;
-            // } else {
-            //   // Clear tokens and redirect to login
-            //   await _clearTokens();
-            // }
+            // TODO: refresh token nếu cần
+            // await _clearTokens();
           }
           handler.next(error);
         },
       ),
     );
 
-    // Logging interceptor (only in debug mode)
-    _dio.interceptors.add(
-      PrettyDioLogger(
-        requestHeader: true,
-        requestBody: true,
-        responseBody: true,
-        responseHeader: false,
-        error: true,
-        compact: true,
-        maxWidth: 90,
-      ),
-    );
+    // Logging interceptor
+    if (ApiConfig.ENABLE_LOGGING) {
+      _dio.interceptors.add(
+        PrettyDioLogger(
+          requestHeader: true,
+          requestBody: true,
+          responseBody: true,
+          responseHeader: false,
+          error: true,
+          compact: true,
+          maxWidth: 90,
+        ),
+      );
+    }
   }
-
-  // // Refresh token logic
-  // Future<bool> _refreshToken() async {
-  //   try {
-  //     final refreshToken = await _secureStorage.read(
-  //       key: ApiConstants.refreshTokenKey,
-  //     );
-  //     if (refreshToken == null) return false;
-
-  //     final response = await _dio.post(
-  //       ApiConstants.refreshToken,
-  //       data: {'refresh_token': refreshToken},
-  //       options: Options(
-  //         headers: {
-  //           ApiConstants.authorization: null,
-  //         }, // Remove auth header for refresh
-  //       ),
-  //     );
-
-  //     if (response.statusCode == 200) {
-  //       final newAccessToken = response.data['access_token'];
-  //       final newRefreshToken = response.data['refresh_token'];
-
-  //       await _secureStorage.write(
-  //         key: ApiConstants.accessTokenKey,
-  //         value: newAccessToken,
-  //       );
-  //       await _secureStorage.write(
-  //         key: ApiConstants.refreshTokenKey,
-  //         value: newRefreshToken,
-  //       );
-
-  //       return true;
-  //     }
-  //   } catch (e) {
-  //     print('Token refresh failed: $e');
-  //   }
-  //   return false;
-  // }
 
   // Clear stored tokens
   Future<void> _clearTokens() async {
@@ -168,7 +150,10 @@ class ApiClient {
     }
   }
 
+  // ==========================
   // HTTP Methods
+  // ==========================
+
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,

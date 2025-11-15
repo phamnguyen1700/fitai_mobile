@@ -1,10 +1,6 @@
-import 'package:fitai_mobile/core/config/api/api_config.dart';
+import 'package:fitai_mobile/core/api/api_config.dart';
 
 class ApiConstants {
-  // Base URLs (using ApiConfig)
-  static String get baseUrl => ApiConfig.baseUrl;
-  static String get fullBaseUrl => ApiConfig.fullBaseUrl;
-
   // Timeout configurations
   static Duration get connectTimeout =>
       Duration(seconds: ApiConfig.CONNECT_TIMEOUT);
@@ -22,6 +18,7 @@ class ApiConstants {
   static const String resetPassword = '/auth/reset-password';
   static const String verifyEmail = '/auth/verify-email';
   static const String activityLevels = '/api/metadata/activity-levels';
+  static const String subscriptionProducts = '/subscription/active-products';
   static const String bodygramUpload = '/bodygram/upload-body-images';
   static const String dietaryPreference = '/dietarypreference';
 
@@ -40,4 +37,12 @@ class ApiConstants {
   static const String accessTokenKey = 'access_token';
   static const String refreshTokenKey = 'refresh_token';
   static const String userDataKey = 'user_data';
+
+  //workout
+  static const String workoutDemo = '/workoutdemo';
+  static const mealDemo = '/mealdemo';
+  static const mealDemoDetail = '/mealdemodetail';
+
+  //chat
+  static const String chatThreads = '/chatthreads';
 }

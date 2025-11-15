@@ -6,9 +6,9 @@ import '../widgets/daily_challenge_card.dart';
 import '../widgets/daily_progress_card.dart';
 import '../widgets/todo_card.dart';
 
-import '../models/progress_item.dart';
-import '../models/meal_models.dart';
-import '../models/workout_models.dart';
+import '../../data/models/progress_item.dart';
+import '../../data/models/meal_models.dart';
+import '../../data/models/workout_plan_block.dart';
 import 'package:fitai_mobile/features/process/presentation/widgets/progress_overview_card.dart';
 
 class DailyScreen extends StatefulWidget {
@@ -54,31 +54,39 @@ class _DailyScreenState extends State<DailyScreen> {
       ProgressItem(title: 'Trưa', done: 0, total: 2, unit: 'món'),
       ProgressItem(title: 'Bữa phụ', done: 0, total: 2, unit: 'món'),
     ];
+
+    // 🔥 Workout blocks – đã thêm category / sets / reps / minutes
     final workoutBlocks = <WorkoutPlanBlock>[
       WorkoutPlanBlock(
         title: 'Tập ngực',
-        leftStat: 'Nâng tạ',
-        rightStat: '2 set 15 lần',
+        leftStat: 'Bench press',
+        rightStat: '3 × 12',
         progress: 0.5,
         calories: 500,
         levels: const ['Người mới', 'Trung cấp', 'Nâng cao'],
-        videoTitle: 'Nâng tạ – Beginner',
+        videoTitle: 'Bench press – Beginner',
         videoThumb:
             'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200',
+        category: 'Ngực', // NEW
+        sets: 3, // NEW
+        reps: 12, // NEW
         checked: true,
       ),
       WorkoutPlanBlock(
         title: 'Cardio',
         leftStat: 'Chạy tại chỗ',
-        rightStat: '5km',
+        rightStat: '20 phút',
         progress: 0.25,
-        calories: 500,
+        calories: 300,
         levels: const ['Người mới', 'Trung cấp', 'Nâng cao'],
-        videoTitle: 'Squat cơ bản – Beginner',
+        videoTitle: 'Cardio tại chỗ – Beginner',
         videoThumb:
             'https://images.unsplash.com/photo-1558611848-73f7eb4001a1?w=1200',
+        category: 'Cardio', // NEW
+        minutes: 20, // NEW
       ),
     ];
+
     final mealGroups = <MealGroup>[
       MealGroup('Sáng', [
         MealItem('Bánh mì', {'Bánh mì': '2 lát'}),
@@ -99,6 +107,7 @@ class _DailyScreenState extends State<DailyScreen> {
 
     return Scaffold(
       body: SafeArea(
+        top: false,
         child: CustomScrollView(
           slivers: [
             const SliverToBoxAdapter(

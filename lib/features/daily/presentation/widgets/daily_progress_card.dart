@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/progress_item.dart';
+import '../../data/models/progress_item.dart';
 
 class DailyProgressCard extends StatefulWidget {
   const DailyProgressCard({
