@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppTextField extends StatefulWidget {
   const AppTextField({
@@ -21,6 +22,8 @@ class AppTextField extends StatefulWidget {
     this.validator,
     this.onSubmitted,
     this.textAlign,
+    this.focusNode, // 👈 NEW
+    this.inputFormatters, // 👈 NEW
   });
 
   final TextEditingController? controller;
@@ -42,6 +45,10 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final TextAlign? textAlign;
 
+  // 👇 thêm 2 tham số mới
+  final FocusNode? focusNode;
+  final List<TextInputFormatter>? inputFormatters;
+
   @override
   State<AppTextField> createState() => _AppTextFieldState();
 }
@@ -57,7 +64,9 @@ class _AppTextFieldState extends State<AppTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final inputTheme = theme.inputDecorationTheme;
 
     return TextFormField(
       controller: widget.controller,
@@ -72,6 +81,8 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       onFieldSubmitted: widget.onSubmitted,
       textAlign: widget.textAlign ?? TextAlign.start,
+      focusNode: widget.focusNode, // 👈 dùng focusNode
+      inputFormatters: widget.inputFormatters, // 👈 dùng formatters
       decoration:
           InputDecoration(
             labelText: widget.label,
@@ -89,15 +100,11 @@ class _AppTextFieldState extends State<AppTextField> {
                     onPressed: () => setState(() => _obscure = !_obscure),
                   )
                 : (widget.suffixIcon == null ? null : Icon(widget.suffixIcon)),
-            // màu đã cấu hình trong AppTheme.inputDecorationTheme
           ).copyWith(
-            // hover/focus ripple màu đúng M3
-            suffixIconColor:
-                Theme.of(context).inputDecorationTheme.suffixIconColor ??
-                cs.onSurfaceVariant,
-            prefixIconColor:
-                Theme.of(context).inputDecorationTheme.prefixIconColor ??
-                cs.onSurfaceVariant,
+            // giữ màu từ theme, chỉ fallback nếu null
+            contentPadding: inputTheme.contentPadding,
+            suffixIconColor: inputTheme.suffixIconColor ?? cs.onSurfaceVariant,
+            prefixIconColor: inputTheme.prefixIconColor ?? cs.onSurfaceVariant,
           ),
     );
   }

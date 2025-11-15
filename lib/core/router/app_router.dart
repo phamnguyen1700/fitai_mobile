@@ -15,13 +15,13 @@ import 'package:fitai_mobile/features/auth/presentation/views/verification_scree
 import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/overview_step.dart';
 import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/body_step.dart';
 import 'package:fitai_mobile/features/profile_setup/presentation/views/steps/diet_step.dart';
-import 'package:fitai_mobile/features/payment/presentation/views/payment.dart';
-import 'package:fitai_mobile/features/payment/presentation/views/checkout.dart';
-import 'package:fitai_mobile/features/payment/presentation/views/result.dart';
+import 'package:fitai_mobile/features/payment/presentation/views/subscriptions_screen.dart';
+import 'package:fitai_mobile/features/payment/presentation/views/checkout_screen.dart';
+import 'package:fitai_mobile/features/payment/presentation/views/result_screen.dart';
 import 'package:fitai_mobile/features/process/presentation/views/process.dart';
 import 'package:fitai_mobile/features/daily/presentation/views/daily.dart';
 import 'package:fitai_mobile/features/setting/presentation/views/setting.dart';
-import 'package:fitai_mobile/features/home/presentation/views/chat.dart';
+import 'package:fitai_mobile/features/home/presentation/views/chat_screen.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
 
 enum AppRoute {
@@ -105,7 +105,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // ===== Payment flow =====
       GoRoute(
         path: '/payment',
-        pageBuilder: (c, s) => _fade(s, const PaymentScreen()),
+        pageBuilder: (c, s) => _fade(s, const SubscriptionsScreen()),
         routes: [
           GoRoute(
             path: 'checkout',

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/workout_models.dart';
-import '../models/meal_models.dart';
+import '../../data/models/workout_plan_block.dart';
+import '../../data/models/meal_models.dart';
 import 'workout_plan.dart';
 import 'meal_plan.dart';
 

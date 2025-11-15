@@ -7,7 +7,7 @@ import '../models/register_request.dart';
 import '../models/auth_response.dart';
 
 class AuthApiService {
-  final ApiClient _apiClient = ApiClient();
+  final ApiClient _apiClient = ApiClient.account();
 
   // Login user
   Future<AuthResponse> login(LoginRequest loginRequest) async {

@@ -9,6 +9,9 @@ import 'package:fitai_mobile/features/profile_setup/data/models/bodygram_upload_
 import 'package:fitai_mobile/features/auth/data/repositories/auth_repository.dart';
 import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
 
+// 🔹 Hàm chuẩn hoá ảnh
+import 'package:fitai_mobile/features/camera/image_normalizer.dart';
+
 class BodygramRepository {
   BodygramRepository(this._api, this._authRepository);
 
@@ -67,16 +70,31 @@ class BodygramRepository {
 
     // 6. Sau khi fallback mà vẫn thiếu thì mới coi là lỗi
     if (height == null || weight == null) {
-      // 👇 log thêm cho rõ lý do
       throw StateError('Thiếu chiều cao hoặc cân nặng');
     }
 
-    // 7. Tạo request upload
+    // 7. 🔥 Chuẩn hoá ảnh theo đúng yêu cầu BE (9:16, 1080x1920)
+    final originalFront = File(draft.frontBodyPhotoPath!);
+    final originalSide = File(draft.sideBodyPhotoPath!);
+
+    final normalizedFront = await normalizeBodyPhoto(originalFront);
+    final normalizedSide = await normalizeBodyPhoto(originalSide);
+
+    debugPrint(
+      '[BodygramRepo] Normalized files => '
+      'front=${normalizedFront.path}, side=${normalizedSide.path}',
+    );
+
+    // (tuỳ bạn, nếu muốn dùng lại sau thì có thể gán ngược vào draft)
+    // draft.frontBodyPhotoPath = normalizedFront.path;
+    // draft.sideBodyPhotoPath  = normalizedSide.path;
+
+    // 8. Tạo request upload với file đã normalize
     final req = BodygramUploadRequest(
       height: height,
       weight: weight,
-      frontPhoto: File(draft.frontBodyPhotoPath!),
-      rightPhoto: File(draft.sideBodyPhotoPath!),
+      frontPhoto: normalizedFront,
+      rightPhoto: normalizedSide,
     );
 
     debugPrint(
@@ -84,7 +102,7 @@ class BodygramRepository {
       '(h=$height, w=$weight, front=${req.frontPhoto.path}, side=${req.rightPhoto.path})',
     );
 
-    // 8. Gọi API
+    // 9. Gọi API
     await _api.uploadBodyImages(req);
   }
 }

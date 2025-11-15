@@ -35,10 +35,15 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final canPop = Navigator.of(context).canPop();
+    final baseColor = backgroundColor ?? theme.colorScheme.surface;
 
     final ht = theme.extension<AppHeaderTheme>();
-    final glassColor =
-        ht?.backdropColor ?? theme.colorScheme.surface.withOpacity(0.5);
+
+    final glassColor = Color.alphaBlend(
+      const Color.fromARGB(31, 128, 128, 128), // xám nhạt phủ lên
+      baseColor.withOpacity(0.5), // độ trong suốt thấp
+    );
+
     final sigma = ht?.blurSigma ?? 12.0;
 
     return AppBar(
@@ -51,7 +56,7 @@ class AppAppBar extends StatelessWidget implements PreferredSizeWidget {
         // blur nền AppBar
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-          child: Container(color: backgroundColor ?? glassColor),
+          child: Container(color: glassColor),
         ),
       ),
       centerTitle: true,

@@ -4,9 +4,7 @@ import 'package:fitai_mobile/core/api/api_constants.dart';
 import '../models/bodygram_upload_request.dart';
 
 class BodygramApiService {
-  final ApiClient _client;
-
-  BodygramApiService({ApiClient? client}) : _client = client ?? ApiClient();
+  final ApiClient _client = ApiClient.account();
 
   Future<void> uploadBodyImages(BodygramUploadRequest request) async {
     final formData = FormData.fromMap({
