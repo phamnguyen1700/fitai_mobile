@@ -1,14 +1,19 @@
 // lib/features/home/presentation/views/chat.dart
+import 'dart:async';
+
 import 'package:fitai_mobile/features/home/data/models/chat_thread_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
+import 'package:fitai_mobile/features/home/presentation/views/plan_demo_screen.dart'
+    show PlanDemoBody;
 import 'package:fitai_mobile/features/home/presentation/views/plan_preview_screen.dart'
     show PlanPreviewBody;
 import 'package:go_router/go_router.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/chat_thread_provider.dart';
 import 'package:fitai_mobile/core/widgets/app_chat_bubble.dart';
 import 'package:fitai_mobile/core/widgets/app_chat_input_bar.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class HomeHostScreen extends ConsumerWidget {
   const HomeHostScreen({super.key});
@@ -18,7 +23,12 @@ class HomeHostScreen extends ConsumerWidget {
     final view = ref.watch(homeViewProvider);
 
     // Nếu đang xem Plan Preview
-    if (view == HomeView.plan) {
+    if (view == HomeView.planDemo) {
+      return const PlanDemoBody();
+    }
+
+    // Nếu đang xem Plan Preview (meal plan)
+    if (view == HomeView.planPreview) {
       return const PlanPreviewBody();
     }
 
@@ -100,9 +110,9 @@ class _FreePlanTeaser extends ConsumerWidget {
             width: double.infinity,
             child: FilledButton.icon(
               icon: const Icon(Icons.auto_graph_rounded),
-              label: const Text('Xem Plan Preview'),
+              label: const Text('Xem Plan Demo'),
               onPressed: () =>
-                  ref.read(homeViewProvider.notifier).state = HomeView.plan,
+                  ref.read(homeViewProvider.notifier).state = HomeView.planDemo,
             ),
           ),
         ],
@@ -330,9 +340,8 @@ class _ConversationList extends StatelessWidget {
 }
 
 //// =======================
-//// PRO PLAN – CHAT SCREEN
+/// PRO PLAN – CHAT SCREEN
 //// =======================
-
 class _ProPlanChat extends ConsumerStatefulWidget {
   const _ProPlanChat({
     super.key,
@@ -352,16 +361,108 @@ class _ProPlanChat extends ConsumerStatefulWidget {
 }
 
 class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
-  final List<({String text, bool isMe})> _messages = [];
+  final List<({String text, bool isMe})> _sessionMessages = [];
   bool _isSending = false;
+  bool _isTyping = false;
+
+  bool _isSavingHealth = false;
+  bool _hasJustSaved = false;
+
+  bool _showPlanCta = false;
+
+  bool _isGeneratingPlan = false;
+  double _planProgress = 0.0;
+  bool _planReady = false;
+  Timer? _planTimer;
+
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _planTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
-    // Nếu là thread mới tạo, add luôn câu chào AI từ server
-    if (widget.initialAiMessage != null &&
-        widget.initialAiMessage!.trim().isNotEmpty) {
-      _messages.add((text: widget.initialAiMessage!, isMe: false));
+  }
+
+  void _startPlanProgress() {
+    _planTimer?.cancel();
+    _planProgress = 0.0;
+
+    void tick(double target, Duration duration) {
+      final start = _planProgress;
+      final diff = target - start;
+      const step = Duration(milliseconds: 80);
+      int elapsed = 0;
+
+      _planTimer = Timer.periodic(step, (timer) {
+        elapsed += step.inMilliseconds;
+        final t = (elapsed / duration.inMilliseconds).clamp(0.0, 1.0);
+        setState(() {
+          _planProgress = start + diff * t;
+        });
+        if (t >= 1.0) timer.cancel();
+      });
+    }
+
+    tick(0.30, const Duration(seconds: 10));
+    Future.delayed(const Duration(seconds: 10), () {
+      if (!mounted || !_isGeneratingPlan) return;
+      tick(0.65, const Duration(seconds: 15));
+    });
+    Future.delayed(const Duration(seconds: 25), () {
+      if (!mounted || !_isGeneratingPlan) return;
+      tick(0.90, const Duration(seconds: 20));
+    });
+  }
+
+  Future<void> _handleGetPlan() async {
+    // Nếu plan đã sẵn sàng → chuyển sang màn PlanPreview
+    if (_planReady && !_isGeneratingPlan) {
+      ref.read(homeViewProvider.notifier).state = HomeView.planPreview;
+      return;
+    }
+
+    // Đang generate thì bỏ qua
+    if (_isGeneratingPlan) return;
+
+    // Bắt đầu generate
+    setState(() {
+      _isGeneratingPlan = true;
+      _planReady = false;
+      _planProgress = 0.0;
+    });
+    _startPlanProgress();
+
+    try {
+      final repo = ref.read(chatThreadRepositoryProvider);
+
+      // GỌI API để tạo plan (chỉ để đảm bảo server đã generate xong)
+      await repo.generateMealPlan();
+
+      if (!mounted) return;
+
+      // Kết thúc loading, báo plan sẵn sàng (Không chuyển màn)
+      setState(() {
+        _isGeneratingPlan = false;
+        _planReady = true;
+        _planProgress = 1.0;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _planTimer?.cancel();
+      setState(() {
+        _isGeneratingPlan = false;
+        _planReady = false;
+        _planProgress = 0.0;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tạo plan thất bại, thử lại sau nhé.')),
+      );
     }
   }
 
@@ -370,8 +471,9 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
     if (trimmed.isEmpty || _isSending) return;
 
     setState(() {
-      _messages.add((text: trimmed, isMe: true)); // message của user
+      _sessionMessages.add((text: trimmed, isMe: true));
       _isSending = true;
+      _isTyping = true;
     });
 
     try {
@@ -382,13 +484,55 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
         ).future,
       );
 
-      // reply là ChatMessage từ server (thường role = 'assistant' hay tương tự)
+      // reply là ChatMessage từ server
+      final isUser = reply.role.toLowerCase() == 'user';
+
       setState(() {
-        _messages.add((
-          text: reply.content,
-          isMe: reply.role == 'customer' ? true : false,
-        ));
+        _sessionMessages.add((text: reply.content, isMe: isUser));
       });
+
+      // ======= LƯU HỒ SƠ SỨC KHỎE (NẾU CÓ META) =======
+      final meta = reply.data;
+      if (meta != null) {
+        setState(() {
+          _isSavingHealth = true;
+          _hasJustSaved = false;
+        });
+
+        // dùng class-based provider: AiHealthPlanCreateController
+        ref
+            .read(aiHealthPlanCreateControllerProvider.notifier)
+            .saveFromMeta(meta)
+            .then((_) {
+              if (!mounted) return;
+              setState(() {
+                _isSavingHealth = false;
+                _hasJustSaved = true;
+                _showPlanCta = true;
+              });
+
+              // 2s sau tự ẩn thông báo "đã lưu"
+              Future.delayed(const Duration(seconds: 2), () {
+                if (!mounted) return;
+                setState(() => _hasJustSaved = false);
+              });
+            })
+            .catchError((error, stack) {
+              if (!mounted) return;
+              setState(() {
+                _isSavingHealth = false;
+                _hasJustSaved = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Lưu hồ sơ sức khỏe thất bại, thử lại sau nhé.',
+                  ),
+                ),
+              );
+            });
+      }
+      // ================================================
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -396,7 +540,10 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
       ).showSnackBar(const SnackBar(content: Text('Gửi tin nhắn thất bại')));
     } finally {
       if (mounted) {
-        setState(() => _isSending = false);
+        setState(() {
+          _isSending = false;
+          _isTyping = false;
+        });
       }
     }
   }
@@ -405,6 +552,11 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
+
+    // 👇 Lấy lịch sử chat từ API
+    final historyAsync = ref.watch(
+      threadMessagesProvider(threadId: widget.conversationId),
+    );
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -447,15 +599,124 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ====== Vùng message scroll được ======
-                  Expanded(child: _ChatMessageList(messages: _messages)),
+                  // ====== Vùng message scroll được + history + session ======
+                  Expanded(
+                    child: historyAsync.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (err, st) => Center(
+                        child: Text(
+                          'Không tải được lịch sử chat.\n$err',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      data: (historyMessages) {
+                        final historyTuples = historyMessages
+                            .map<({String text, bool isMe})>(
+                              (m) => (
+                                text: m.content,
+                                isMe: m.role.toLowerCase() == 'user',
+                              ),
+                            );
 
+                        final allMessages = <({String text, bool isMe})>[];
+
+                        if (historyMessages.isEmpty &&
+                            widget.initialAiMessage != null &&
+                            widget.initialAiMessage!.trim().isNotEmpty) {
+                          allMessages.add((
+                            text: widget.initialAiMessage!.trim(),
+                            isMe: false,
+                          ));
+                        }
+
+                        allMessages.addAll(historyTuples);
+                        allMessages.addAll(_sessionMessages);
+
+                        if (allMessages.isEmpty && !_isSending) {
+                          return Center(
+                            child: Text(
+                              'Hãy bắt đầu trò chuyện với FitAI ✨',
+                              style: t.bodyMedium,
+                            ),
+                          );
+                        }
+
+                        final hasPlanMetaInHistory = historyMessages.any(
+                          (m) => m.data != null,
+                        );
+
+                        final showPlanCta =
+                            hasPlanMetaInHistory || _showPlanCta;
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(
+                              _scrollController.position.maxScrollExtent,
+                              duration: const Duration(milliseconds: 250),
+                              curve: Curves.easeOut,
+                            );
+                          }
+                        });
+
+                        return Column(
+                          children: [
+                            Expanded(
+                              child: _ChatMessageList(
+                                messages: allMessages,
+                                showPlanCta: showPlanCta,
+                                onGetPlan: _handleGetPlan,
+                                controller: _scrollController,
+                                isTyping: _isTyping,
+                                isGeneratingPlan: _isGeneratingPlan,
+                                planProgress: _planProgress,
+                                isPlanReady: _planReady,
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  if (_isSavingHealth || _hasJustSaved)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_isSavingHealth)
+                              LoadingAnimationWidget.waveDots(
+                                color: cs.primary,
+                                size: 18,
+                              )
+                            else
+                              Icon(
+                                Icons.check_circle_rounded,
+                                size: 18,
+                                color: cs.primary,
+                              ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _isSavingHealth
+                                  ? 'Đang lưu hồ sơ sức khỏe của bạn...'
+                                  : 'Hồ sơ sức khỏe của bạn đã được lưu.',
+                              style: t.bodySmall?.copyWith(color: cs.onSurface),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 8),
 
                   // ====== Input ======
                   AppChatInputBar(
                     onSend: _handleSend,
-                    // nếu AppChatInputBar có hỗ trợ isLoading thì truyền thêm
+                    // nếu AppChatInputBar có hỗ trợ isLoading:
                     // isLoading: _isSending,
                   ),
                 ],
@@ -471,33 +732,266 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
 }
 
 //// =======================
-//// WIDGET RENDER LIST MESSAGE
+/// WIDGET RENDER LIST MESSAGE
 //// =======================
-
 class _ChatMessageList extends StatelessWidget {
-  const _ChatMessageList({super.key, required this.messages});
+  const _ChatMessageList({
+    super.key,
+    required this.messages,
+    this.isTyping = false,
+    this.showPlanCta = false,
+    this.onGetPlan,
+    this.controller,
+    this.isGeneratingPlan = false,
+    this.planProgress = 0.0,
+    this.isPlanReady = false,
+  });
 
   final List<({String text, bool isMe})> messages;
 
+  final bool isTyping;
+  final bool showPlanCta;
+
+  final bool isGeneratingPlan;
+
+  final double planProgress;
+  final bool isPlanReady;
+
+  final VoidCallback? onGetPlan;
+  final ScrollController? controller;
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    final baseCount = messages.length;
+    final total = baseCount + (showPlanCta ? 1 : 0) + (isTyping ? 1 : 0);
+
     return ListView.builder(
+      controller: controller,
       padding: const EdgeInsets.only(bottom: 8),
-      itemCount: messages.length,
+      itemCount: total,
       itemBuilder: (context, index) {
-        final m = messages[index];
-        return Align(
-          alignment: m.isMe ? Alignment.centerRight : Alignment.centerLeft,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-            child: AppChatBubble(
-              text: m.text,
-              isMe: m.isMe,
-              botAvatar: 'lib/core/assets/images/chatbot.png',
+        // 1) Các bubble chat bình thường
+        if (index < baseCount) {
+          final m = messages[index];
+          return Align(
+            alignment: m.isMe ? Alignment.centerRight : Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              child: AppChatBubble(
+                text: m.text,
+                isMe: m.isMe,
+                botAvatar: 'lib/core/assets/images/chatbot.png',
+              ),
             ),
-          ),
-        );
+          );
+        }
+
+        if (showPlanCta && index == baseCount) {
+          return Padding(
+            padding: const EdgeInsets.only(
+              top: 6,
+              left: 25,
+              right: 4,
+              bottom: 4,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(width: 22),
+                _BlinkWrapper(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.78,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          isGeneratingPlan
+                              ? 'Đang tạo plan cho bạn...'
+                              : isPlanReady
+                              ? 'Plan cá nhân hóa của bạn đã sẵn sàng'
+                              : 'Mình đã sẵn sàng làm plan cá nhân hóa cho bạn',
+                          style: t.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+
+                        if (isGeneratingPlan)
+                          SizedBox(
+                            width:
+                                MediaQuery.of(context).size.width *
+                                0.5, // dài hơn
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: planProgress.clamp(0.0, 1.0),
+                                minHeight: 4,
+                                backgroundColor: cs.primary.withOpacity(0.12),
+                                valueColor: AlwaysStoppedAnimation(cs.primary),
+                              ),
+                            ),
+                          )
+                        else
+                          GestureDetector(
+                            onTap: onGetPlan,
+                            child: Text(
+                              isPlanReady ? 'Xem plan' : 'Nhận plan',
+                              style: t.labelMedium?.copyWith(
+                                color: cs.primary,
+                                fontWeight: FontWeight.w700,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // 3) Typing indicator
+        if (isTyping && index == total - 1) {
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+              child: AppChatBubble(
+                text: '',
+                isMe: false,
+                botAvatar: 'lib/core/assets/images/chatbot.png',
+                child: LoadingAnimationWidget.waveDots(
+                  color: cs.onSurface,
+                  size: 22,
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
+    );
+  }
+}
+
+class _BlinkWrapper extends StatefulWidget {
+  final Widget child;
+
+  const _BlinkWrapper({super.key, required this.child});
+
+  @override
+  State<_BlinkWrapper> createState() => _BlinkWrapperState();
+}
+
+class _BlinkWrapperState extends State<_BlinkWrapper> {
+  double _opacity = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _startBlink();
+  }
+
+  void _startBlink() async {
+    while (mounted) {
+      await Future.delayed(const Duration(milliseconds: 850));
+      if (!mounted) return;
+      setState(() => _opacity = _opacity == 1 ? 0.35 : 1);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: _opacity,
+      duration: const Duration(milliseconds: 450),
+      child: widget.child,
+    );
+  }
+}
+
+class PlanGenerateProgressBar extends StatefulWidget {
+  final bool isDone;
+
+  const PlanGenerateProgressBar({super.key, required this.isDone});
+
+  @override
+  State<PlanGenerateProgressBar> createState() =>
+      _PlanGenerateProgressBarState();
+}
+
+class _PlanGenerateProgressBarState extends State<PlanGenerateProgressBar> {
+  double _progress = 0.0;
+  bool _finishedFake = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startFakeProgress();
+  }
+
+  @override
+  void didUpdateWidget(covariant PlanGenerateProgressBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isDone && !oldWidget.isDone) {
+      _jumpToComplete();
+    }
+  }
+
+  Future<void> _startFakeProgress() async {
+    const phases = [0.35, 0.68, 0.9];
+
+    for (final target in phases) {
+      // chạy tới mốc target
+      while (mounted &&
+          !widget.isDone &&
+          _progress < target &&
+          !_finishedFake) {
+        setState(() {
+          _progress = (_progress + 0.01).clamp(0.0, target);
+        });
+        await Future.delayed(const Duration(milliseconds: 80));
+      }
+
+      if (!mounted || widget.isDone) break;
+
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    _finishedFake = true;
+  }
+
+  Future<void> _jumpToComplete() async {
+    while (mounted && _progress < 1.0) {
+      setState(() {
+        _progress = (_progress + 0.04).clamp(0.0, 1.0);
+      });
+      await Future.delayed(const Duration(milliseconds: 40));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: LinearProgressIndicator(
+        value: _progress,
+        minHeight: 3,
+        backgroundColor: cs.primary.withOpacity(0.1),
+        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+      ),
     );
   }
 }

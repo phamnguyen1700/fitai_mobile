@@ -125,14 +125,14 @@ class AppTheme {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         iconTheme: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
-          return IconThemeData(color: selected ? cs.primary : cs.outline);
+          return IconThemeData(color: selected ? cs.primary : cs.tertiary);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           final selected = states.contains(WidgetState.selected);
           return TextStyle(
             fontSize: 12,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            color: selected ? cs.primary : cs.outline,
+            color: selected ? cs.primary : cs.tertiary,
           );
         }),
       ),

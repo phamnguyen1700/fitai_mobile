@@ -206,7 +206,7 @@ class _CreateChatThreadProviderElement
   String get threadType => (origin as CreateChatThreadProvider).threadType;
 }
 
-String _$sendChatMessageHash() => r'e5d19a82c75d6317037925a419fffc52da8fea6e';
+String _$sendChatMessageHash() => r'e92b8ea0585835c5a06e2727702f4b08e50f2dfc';
 
 /// See also [sendChatMessage].
 @ProviderFor(sendChatMessage)
@@ -221,7 +221,7 @@ class SendChatMessageFamily extends Family<AsyncValue<ChatMessage>> {
   SendChatMessageProvider call({
     required String threadId,
     required String content,
-    String role = 'customer',
+    String role = 'user',
     String? data,
   }) {
     return SendChatMessageProvider(
@@ -265,7 +265,7 @@ class SendChatMessageProvider extends AutoDisposeFutureProvider<ChatMessage> {
   SendChatMessageProvider({
     required String threadId,
     required String content,
-    String role = 'customer',
+    String role = 'user',
     String? data,
   }) : this._internal(
          (ref) => sendChatMessage(
@@ -385,5 +385,217 @@ class _SendChatMessageProviderElement
   String? get data => (origin as SendChatMessageProvider).data;
 }
 
+String _$threadMessagesHash() => r'e0c460a829eb1b34b66796ccc1943f03e2e3248d';
+
+/// =======================
+/// GET messages của 1 thread
+/// =======================
+///
+/// Copied from [threadMessages].
+@ProviderFor(threadMessages)
+const threadMessagesProvider = ThreadMessagesFamily();
+
+/// =======================
+/// GET messages của 1 thread
+/// =======================
+///
+/// Copied from [threadMessages].
+class ThreadMessagesFamily extends Family<AsyncValue<List<ChatMessage>>> {
+  /// =======================
+  /// GET messages của 1 thread
+  /// =======================
+  ///
+  /// Copied from [threadMessages].
+  const ThreadMessagesFamily();
+
+  /// =======================
+  /// GET messages của 1 thread
+  /// =======================
+  ///
+  /// Copied from [threadMessages].
+  ThreadMessagesProvider call({required String threadId}) {
+    return ThreadMessagesProvider(threadId: threadId);
+  }
+
+  @override
+  ThreadMessagesProvider getProviderOverride(
+    covariant ThreadMessagesProvider provider,
+  ) {
+    return call(threadId: provider.threadId);
+  }
+
+  static const Iterable<ProviderOrFamily>? _dependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get dependencies => _dependencies;
+
+  static const Iterable<ProviderOrFamily>? _allTransitiveDependencies = null;
+
+  @override
+  Iterable<ProviderOrFamily>? get allTransitiveDependencies =>
+      _allTransitiveDependencies;
+
+  @override
+  String? get name => r'threadMessagesProvider';
+}
+
+/// =======================
+/// GET messages của 1 thread
+/// =======================
+///
+/// Copied from [threadMessages].
+class ThreadMessagesProvider
+    extends AutoDisposeFutureProvider<List<ChatMessage>> {
+  /// =======================
+  /// GET messages của 1 thread
+  /// =======================
+  ///
+  /// Copied from [threadMessages].
+  ThreadMessagesProvider({required String threadId})
+    : this._internal(
+        (ref) => threadMessages(ref as ThreadMessagesRef, threadId: threadId),
+        from: threadMessagesProvider,
+        name: r'threadMessagesProvider',
+        debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+            ? null
+            : _$threadMessagesHash,
+        dependencies: ThreadMessagesFamily._dependencies,
+        allTransitiveDependencies:
+            ThreadMessagesFamily._allTransitiveDependencies,
+        threadId: threadId,
+      );
+
+  ThreadMessagesProvider._internal(
+    super._createNotifier, {
+    required super.name,
+    required super.dependencies,
+    required super.allTransitiveDependencies,
+    required super.debugGetCreateSourceHash,
+    required super.from,
+    required this.threadId,
+  }) : super.internal();
+
+  final String threadId;
+
+  @override
+  Override overrideWith(
+    FutureOr<List<ChatMessage>> Function(ThreadMessagesRef provider) create,
+  ) {
+    return ProviderOverride(
+      origin: this,
+      override: ThreadMessagesProvider._internal(
+        (ref) => create(ref as ThreadMessagesRef),
+        from: from,
+        name: null,
+        dependencies: null,
+        allTransitiveDependencies: null,
+        debugGetCreateSourceHash: null,
+        threadId: threadId,
+      ),
+    );
+  }
+
+  @override
+  AutoDisposeFutureProviderElement<List<ChatMessage>> createElement() {
+    return _ThreadMessagesProviderElement(this);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is ThreadMessagesProvider && other.threadId == threadId;
+  }
+
+  @override
+  int get hashCode {
+    var hash = _SystemHash.combine(0, runtimeType.hashCode);
+    hash = _SystemHash.combine(hash, threadId.hashCode);
+
+    return _SystemHash.finish(hash);
+  }
+}
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+mixin ThreadMessagesRef on AutoDisposeFutureProviderRef<List<ChatMessage>> {
+  /// The parameter `threadId` of this provider.
+  String get threadId;
+}
+
+class _ThreadMessagesProviderElement
+    extends AutoDisposeFutureProviderElement<List<ChatMessage>>
+    with ThreadMessagesRef {
+  _ThreadMessagesProviderElement(super.provider);
+
+  @override
+  String get threadId => (origin as ThreadMessagesProvider).threadId;
+}
+
+String _$mealPlanGenerateHash() => r'bf6644a8bb5f9807b475d3b75e5ccf705733f001';
+
+/// See also [mealPlanGenerate].
+@ProviderFor(mealPlanGenerate)
+final mealPlanGenerateProvider =
+    AutoDisposeFutureProvider<MealPlanGenerateResponse>.internal(
+      mealPlanGenerate,
+      name: r'mealPlanGenerateProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$mealPlanGenerateHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MealPlanGenerateRef =
+    AutoDisposeFutureProviderRef<MealPlanGenerateResponse>;
+String _$mealPlanDailyMealsHash() =>
+    r'c2fe74bc4913fa7347e41305b035aa1f271bc345';
+
+/// Nếu UI chỉ cần list DailyMealPlan cho phần preview
+///
+/// Copied from [mealPlanDailyMeals].
+@ProviderFor(mealPlanDailyMeals)
+final mealPlanDailyMealsProvider =
+    AutoDisposeFutureProvider<List<DailyMealPlan>>.internal(
+      mealPlanDailyMeals,
+      name: r'mealPlanDailyMealsProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$mealPlanDailyMealsHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MealPlanDailyMealsRef =
+    AutoDisposeFutureProviderRef<List<DailyMealPlan>>;
+String _$aiHealthPlanCreateControllerHash() =>
+    r'43fed9cff8462a81072e66a4fbc77c4ee4110d2b';
+
+/// =======================
+/// SAVE AI HEALTH PLAN
+/// =======================
+/// - Gọi khi ChatMessage.data (ChatMessageMeta) != null
+/// - UI có thể watch để hiện loading banner
+///
+/// Copied from [AiHealthPlanCreateController].
+@ProviderFor(AiHealthPlanCreateController)
+final aiHealthPlanCreateControllerProvider =
+    AutoDisposeNotifierProvider<
+      AiHealthPlanCreateController,
+      AsyncValue<void>
+    >.internal(
+      AiHealthPlanCreateController.new,
+      name: r'aiHealthPlanCreateControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$aiHealthPlanCreateControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$AiHealthPlanCreateController = AutoDisposeNotifier<AsyncValue<void>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

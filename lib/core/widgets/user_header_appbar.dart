@@ -1,7 +1,6 @@
 // lib/core/widgets/user_header_appbar.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../config/theme/header_theme.dart';
 
 class UserHeaderAppBar extends StatelessWidget implements PreferredSizeWidget {
   final PreferredSizeWidget header;
@@ -19,45 +18,50 @@ class UserHeaderAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   double get _headerH => header.preferredSize.height;
 
-  // ❗ Không cộng status bar vào đây
   @override
   Size get preferredSize => Size.fromHeight(_headerH);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
     final canPop = Navigator.of(context).canPop();
 
-    final ht = theme.extension<AppHeaderTheme>();
-    final glassColor =
-        ht?.backdropColor ?? theme.colorScheme.surface.withOpacity(0.5);
-    final sigma = ht?.blurSigma ?? 12.0;
+    // 🎨 Glass color cho Light / Dark
+    final glassBg = cs.brightness == Brightness.dark
+        ? const Color.fromARGB(255, 255, 142, 67).withOpacity(0.1)
+        : const Color.fromARGB(255, 255, 142, 67).withOpacity(0.1);
+
+    // Viền glass rất nhẹ
+    final glassBorder = cs.brightness == Brightness.dark
+        ? const Color.fromARGB(255, 255, 255, 255).withOpacity(0.1)
+        : const Color.fromARGB(255, 255, 255, 255).withOpacity(0.1);
 
     return AppBar(
       toolbarHeight: _headerH,
       elevation: 0,
       scrolledUnderElevation: 0,
-      surfaceTintColor: Colors.transparent,
       backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       centerTitle: false,
       title: null,
       bottom: null,
+      automaticallyImplyLeading: false,
 
       leading: (showBack ?? canPop)
           ? IconButton(
               icon: const Icon(Icons.arrow_back),
               onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
             )
           : null,
-      actions: actions,
 
-      // flexibleSpace chỉ làm nền + blur; SafeArea đẩy nội dung khỏi status bar
-      flexibleSpace: ClipRect(
+      flexibleSpace: ClipRRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
           child: Container(
-            color: glassColor,
+            decoration: BoxDecoration(
+              color: glassBg,
+              border: Border(bottom: BorderSide(color: glassBorder, width: 1)),
+            ),
             child: SafeArea(
               top: true,
               bottom: false,
@@ -66,6 +70,7 @@ class UserHeaderAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
       ),
+      actions: actions,
     );
   }
 }

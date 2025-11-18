@@ -19,7 +19,7 @@ import 'package:fitai_mobile/features/payment/presentation/views/subscriptions_s
 import 'package:fitai_mobile/features/payment/presentation/views/checkout_screen.dart';
 import 'package:fitai_mobile/features/payment/presentation/views/result_screen.dart';
 import 'package:fitai_mobile/features/process/presentation/views/process.dart';
-import 'package:fitai_mobile/features/daily/presentation/views/daily.dart';
+import 'package:fitai_mobile/features/daily/presentation/views/daily_screen.dart';
 import 'package:fitai_mobile/features/setting/presentation/views/setting.dart';
 import 'package:fitai_mobile/features/home/presentation/views/chat_screen.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
@@ -31,7 +31,7 @@ enum AppRoute {
   setupOverview,
   setupBody,
   setupDiet,
-  planPreview,
+  planDemo,
 }
 
 /// Debug logger
@@ -134,15 +134,26 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             builder: (ctx, st) => Consumer(
               builder: (context, ref, _) {
                 final view = ref.watch(homeViewProvider);
+
+                final isSubView =
+                    view == HomeView.planDemo || view == HomeView.planPreview;
+
+                // Đổi title nếu thích
+                final title = switch (view) {
+                  HomeView.planDemo => 'Plan demo',
+                  HomeView.planPreview => 'Meal plan cá nhân hóa',
+                  _ => 'AI Coach',
+                };
+
                 return AppScaffold(
                   appBar: AppAppBar(
-                    title: 'AI Coach',
-                    showBack: view == HomeView.plan,
+                    title: title,
+                    showBack: isSubView, // <<< có back cho cả planPreview
                   ),
                   body: PopScope(
-                    canPop: view != HomeView.plan,
+                    canPop: !isSubView,
                     onPopInvokedWithResult: (didPop, result) {
-                      if (!didPop && view == HomeView.plan) {
+                      if (!didPop && isSubView) {
                         ref.read(homeViewProvider.notifier).state =
                             HomeView.chat;
                       }
@@ -191,8 +202,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ),
           ),
         ],
-        builder: (ctx, state, navShell) =>
-            Scaffold(body: navShell, bottomNavigationBar: AppBottomNav()),
+        builder: (context, state, navigationShell) {
+          return Scaffold(
+            body: navigationShell,
+            bottomNavigationBar: AppBottomNav(navigationShell: navigationShell),
+          );
+        },
       ),
     ],
 
