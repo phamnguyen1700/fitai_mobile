@@ -58,9 +58,9 @@ class ApiConfig {
   static const bool ENABLE_LOGGING = true;
   static const bool ENABLE_ERROR_TRACKING = false;
 
-  static const int CONNECT_TIMEOUT = 30;
-  static const int RECEIVE_TIMEOUT = 30;
-  static const int SEND_TIMEOUT = 30;
+  static const int CONNECT_TIMEOUT = 120;
+  static const int RECEIVE_TIMEOUT = 120;
+  static const int SEND_TIMEOUT = 120;
 
   static const String DEFAULT_DEVICE_NAME = 'FitAI Mobile App';
 

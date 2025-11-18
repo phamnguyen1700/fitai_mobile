@@ -37,6 +37,7 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
   VideoPlayerController? _controller;
   bool _initialized = false;
   bool _isPlaying = false;
+  bool _isMuted = true;
   bool _isLoading = false;
   bool _hasError = false;
 
@@ -70,7 +71,7 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
     try {
       await _controller!.initialize();
       _controller!
-        ..setLooping(true)
+        ..setLooping(false)
         ..setVolume(0);
       await _controller!.play();
 
@@ -91,19 +92,25 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
 
   void _onTapVideo() {
     if (_controller == null) {
-      _initAndPlay(); // lần đầu → init + play
+      _initAndPlay();
     } else {
-      _togglePlay(); // đã có controller → pause/play
+      _togglePlay();
     }
   }
 
   void _togglePlay() {
     if (_controller == null || !_initialized) return;
-    if (_controller!.value.isPlaying) {
+    final v = _controller!.value;
+
+    if (v.isPlaying) {
       _controller!.pause();
       setState(() => _isPlaying = false);
     } else {
+      if (v.position >= v.duration) {
+        _controller!.seekTo(Duration.zero);
+      }
       _controller!.play();
+      _controller!.setVolume(_isMuted ? 0 : 1);
       setState(() => _isPlaying = true);
     }
   }
@@ -116,6 +123,16 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
             _FullScreenVideoPage(controller: _controller!, title: widget.title),
       ),
     );
+  }
+
+  void _toggleMute() {
+    if (_controller == null || !_initialized) return;
+
+    setState(() {
+      _isMuted = !_isMuted;
+    });
+
+    _controller!.setVolume(_isMuted ? 0 : 1); // 1 = max volume
   }
 
   @override
@@ -165,7 +182,7 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
                         color: cs.surfaceVariant,
                         child: const Center(
                           child: Icon(
-                            Icons.play_circle_fill,
+                            Icons.play_arrow,
                             size: 52,
                             color: Colors.white,
                           ),
@@ -175,15 +192,23 @@ class _ExerciseVideoTileState extends State<ExerciseVideoTile> {
                     if (_controller != null && _initialized && !_hasError)
                       Positioned(
                         right: 8,
-                        bottom: 8,
+                        bottom: 48,
                         child: IconButton(
-                          icon: const Icon(
-                            Icons.fullscreen,
+                          icon: Icon(
+                            _isMuted ? Icons.volume_off : Icons.volume_up,
                             color: Colors.white,
                           ),
-                          onPressed: _openFullScreen,
+                          onPressed: _toggleMute,
                         ),
                       ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: IconButton(
+                        icon: const Icon(Icons.fullscreen, color: Colors.white),
+                        onPressed: _openFullScreen,
+                      ),
+                    ),
                   ],
                 ),
               ),

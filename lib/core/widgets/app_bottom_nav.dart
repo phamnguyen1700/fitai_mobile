@@ -1,12 +1,15 @@
 // lib/core/widgets/app_bottom_nav.dart
-import 'package:fitai_mobile/core/config/theme/header_theme.dart';
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:fitai_mobile/core/widgets/app_icons.dart';
 import 'dart:ui';
 
+import 'package:fitai_mobile/core/config/theme/header_theme.dart';
+import 'package:fitai_mobile/core/widgets/app_icons.dart';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
 class AppBottomNav extends StatelessWidget {
-  AppBottomNav({super.key});
+  const AppBottomNav({super.key, required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
 
   static const _setupPrefixes = <String>[
     '/welcome',
@@ -21,7 +24,7 @@ class AppBottomNav extends StatelessWidget {
   bool _isSetupLocation(String loc) =>
       _setupPrefixes.any((p) => loc == p || loc.startsWith('$p/'));
 
-  /// Lấy current location an toàn cho go_router 12+ và trong ShellRoute
+  /// Lấy current location an toàn cho go_router 12+
   String _currentLocation(BuildContext context) {
     final info = GoRouter.of(context).routeInformationProvider.value;
     return info.uri.toString();
@@ -32,20 +35,20 @@ class AppBottomNav extends StatelessWidget {
     final location = _currentLocation(context);
     final isSetup = _isSetupLocation(location);
 
-    final theme = Theme.of(context);
-    final borderColor = theme.dividerColor;
-
+    // Nếu đang ở các màn setup/onboarding thì không render bottom nav
     if (isSetup) {
       return const SizedBox.shrink();
     }
 
+    final theme = Theme.of(context);
+    final borderColor = theme.dividerColor;
+
     final ht = theme.extension<AppHeaderTheme>();
     final sigma = ht?.blurSigma ?? 12.0;
 
-    // 👇 giống logic trong AppAppBar
     final baseColor = theme.colorScheme.surface;
     final glassColor = Color.alphaBlend(
-      const Color.fromARGB(31, 128, 128, 128), // xám nhạt phủ lên
+      const Color.fromARGB(31, 173, 173, 173), // xám nhạt phủ lên
       baseColor.withOpacity(0.5), // độ trong suốt thấp
     );
 
@@ -63,30 +66,22 @@ class AppBottomNav extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border(top: BorderSide(color: borderColor)),
             ),
-            child: const SafeArea(
+            child: SafeArea(
               top: false,
               bottom: true,
-              child: _BottomNavBar(
-                currentLocationOf: _currentLocationForBottomNav,
-              ),
+              child: _BottomNavBar(navigationShell: navigationShell),
             ),
           ),
         ),
       ),
     );
   }
-
-  // Workaround để truyền static function vào const _BottomNavBar
-  static String _currentLocationForBottomNav(BuildContext context) {
-    final info = GoRouter.of(context).routeInformationProvider.value;
-    return info.uri.toString();
-  }
 }
 
 class _BottomNavBar extends StatelessWidget {
-  const _BottomNavBar({required this.currentLocationOf});
+  const _BottomNavBar({required this.navigationShell});
 
-  final String Function(BuildContext) currentLocationOf;
+  final StatefulNavigationShell navigationShell;
 
   static const _tabs = [
     ('/home', 'Trang chủ', AppIcons.homeOutline, AppIcons.home),
@@ -95,36 +90,19 @@ class _BottomNavBar extends StatelessWidget {
     ('/profile', 'Hồ sơ', AppIcons.profileOutline, AppIcons.profile),
   ];
 
-  int _indexFrom(String loc) {
-    final i = _tabs.indexWhere(
-      (t) => loc == t.$1 || loc.startsWith('${t.$1}/'),
-    );
-    return i >= 0 ? i : 0;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final loc = currentLocationOf(context);
-    final idx = _indexFrom(loc);
-
-    // Lấy shell nếu đang trong StatefulShellRoute
-    final shell = StatefulNavigationShell.maybeOf(context);
+    // ✅ selected index luôn sync với shell
+    final idx = navigationShell.currentIndex;
 
     return NavigationBar(
-      // 👇 vì bên ngoài đã có glassColor nên để transparent
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-
       selectedIndex: idx,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       onDestinationSelected: (i) {
-        if (shell != null) {
-          shell.goBranch(i, initialLocation: false);
-        } else {
-          final path = _tabs[i].$1;
-          context.go(path);
-        }
+        // goBranch sẽ tự cập nhật currentIndex
+        navigationShell.goBranch(i, initialLocation: false);
       },
       destinations: [
         for (final t in _tabs)

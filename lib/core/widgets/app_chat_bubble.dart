@@ -6,11 +6,15 @@ class AppChatBubble extends StatelessWidget {
     required this.text,
     required this.isMe,
     this.botAvatar,
+    this.child, // 👈 thêm
   });
 
   final String text;
   final bool isMe;
   final String? botAvatar;
+
+  /// Nếu truyền child thì bubble sẽ render child thay vì Text(text)
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +26,7 @@ class AppChatBubble extends StatelessWidget {
 
     Widget botAvatarWidget() {
       return Padding(
-        padding: const EdgeInsets.only(top: 2), // ⭐ canh top nhẹ
+        padding: const EdgeInsets.only(top: 2),
         child: CircleAvatar(
           radius: avatarSize,
           backgroundImage: botAvatar != null ? AssetImage(botAvatar!) : null,
@@ -51,6 +55,7 @@ class AppChatBubble extends StatelessWidget {
         final textColor = isMe
             ? cs.onPrimary
             : (cs.brightness == Brightness.dark ? Colors.white : cs.onSurface);
+
         final bubble = Container(
           constraints: BoxConstraints(maxWidth: maxWidth),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -58,14 +63,16 @@ class AppChatBubble extends StatelessWidget {
             color: bubbleColor,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            text,
-            style: (t.bodyMedium ?? const TextStyle()).copyWith(
-              color: textColor,
-              height: 1.35,
-              fontSize: 15,
-            ),
-          ),
+          child:
+              child ??
+              Text(
+                text,
+                style: (t.bodyMedium ?? const TextStyle()).copyWith(
+                  color: textColor,
+                  height: 1.35,
+                  fontSize: 15,
+                ),
+              ),
         );
 
         return Row(
@@ -73,12 +80,10 @@ class AppChatBubble extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: isMe
               ? [
-                  // USER bubble (không avatar)
-                  bubble,
+                  bubble, // user không có avatar
                 ]
               : [
-                  // BOT bubble (avatar top-left)
-                  botAvatarWidget(),
+                  botAvatarWidget(), // bot có avatar
                   SizedBox(width: gap),
                   bubble,
                 ],

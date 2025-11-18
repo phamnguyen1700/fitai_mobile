@@ -92,7 +92,7 @@ Map<String, dynamic> _$CreateChatThreadDataToJson(
 SendChatMessageRequest _$SendChatMessageRequestFromJson(
   Map<String, dynamic> json,
 ) => SendChatMessageRequest(
-  role: json['role'] as String? ?? 'customer',
+  role: json['role'] as String? ?? 'user',
   content: json['content'] as String,
   data: json['data'] as String?,
 );
@@ -165,3 +165,163 @@ Map<String, dynamic> _$ChatMessageMetaToJson(ChatMessageMeta instance) =>
       'importantNote': instance.importantNote,
       'dietType': instance.dietType,
     };
+
+GetChatMessagesResponse _$GetChatMessagesResponseFromJson(
+  Map<String, dynamic> json,
+) => GetChatMessagesResponse(
+  data: (json['data'] as List<dynamic>)
+      .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+      .toList(),
+  success: json['success'] as bool,
+  message: json['message'] as String,
+);
+
+Map<String, dynamic> _$GetChatMessagesResponseToJson(
+  GetChatMessagesResponse instance,
+) => <String, dynamic>{
+  'data': instance.data.map((e) => e.toJson()).toList(),
+  'success': instance.success,
+  'message': instance.message,
+};
+
+AiHealthPlanCreateRequest _$AiHealthPlanCreateRequestFromJson(
+  Map<String, dynamic> json,
+) => AiHealthPlanCreateRequest(
+  activityLevel: (json['activityLevel'] as num).toInt(),
+  experienceLevel: (json['experienceLevel'] as num).toInt(),
+  healthProblem: json['healthProblem'] as String,
+  goal: json['goal'] as String,
+  nextCheckPoint: (json['nextCheckPoint'] as num).toInt(),
+  workoutDays: (json['workoutDays'] as num).toInt(),
+  importantNote: json['importantNote'] as String,
+  dietType: (json['dietType'] as num).toInt(),
+);
+
+Map<String, dynamic> _$AiHealthPlanCreateRequestToJson(
+  AiHealthPlanCreateRequest instance,
+) => <String, dynamic>{
+  'activityLevel': instance.activityLevel,
+  'experienceLevel': instance.experienceLevel,
+  'healthProblem': instance.healthProblem,
+  'goal': instance.goal,
+  'nextCheckPoint': instance.nextCheckPoint,
+  'workoutDays': instance.workoutDays,
+  'importantNote': instance.importantNote,
+  'dietType': instance.dietType,
+};
+
+AiHealthPlanCreateResponse _$AiHealthPlanCreateResponseFromJson(
+  Map<String, dynamic> json,
+) => AiHealthPlanCreateResponse(
+  success: json['success'] as bool,
+  message: json['message'] as String,
+);
+
+Map<String, dynamic> _$AiHealthPlanCreateResponseToJson(
+  AiHealthPlanCreateResponse instance,
+) => <String, dynamic>{
+  'success': instance.success,
+  'message': instance.message,
+};
+
+MealPlanGenerateResponse _$MealPlanGenerateResponseFromJson(
+  Map<String, dynamic> json,
+) => MealPlanGenerateResponse(
+  data: MealPlanGenerateData.fromJson(json['data'] as Map<String, dynamic>),
+  success: json['success'] as bool,
+  message: json['message'] as String,
+);
+
+Map<String, dynamic> _$MealPlanGenerateResponseToJson(
+  MealPlanGenerateResponse instance,
+) => <String, dynamic>{
+  'data': instance.data.toJson(),
+  'success': instance.success,
+  'message': instance.message,
+};
+
+MealPlanGenerateData _$MealPlanGenerateDataFromJson(
+  Map<String, dynamic> json,
+) => MealPlanGenerateData(
+  processingTime: json['processingTime'] as String,
+  targetCalories: (json['targetCalories'] as num).toInt(),
+  data: MealPlanCoreData.fromJson(json['data'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$MealPlanGenerateDataToJson(
+  MealPlanGenerateData instance,
+) => <String, dynamic>{
+  'processingTime': instance.processingTime,
+  'targetCalories': instance.targetCalories,
+  'data': instance.data.toJson(),
+};
+
+MealPlanCoreData _$MealPlanCoreDataFromJson(Map<String, dynamic> json) =>
+    MealPlanCoreData(
+      dailyMeals: (json['dailyMeals'] as List<dynamic>)
+          .map((e) => DailyMealPlan.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$MealPlanCoreDataToJson(MealPlanCoreData instance) =>
+    <String, dynamic>{
+      'dailyMeals': instance.dailyMeals.map((e) => e.toJson()).toList(),
+    };
+
+DailyMealPlan _$DailyMealPlanFromJson(Map<String, dynamic> json) =>
+    DailyMealPlan(
+      dayNumber: (json['dayNumber'] as num).toInt(),
+      meals: (json['meals'] as List<dynamic>)
+          .map((e) => MealItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$DailyMealPlanToJson(DailyMealPlan instance) =>
+    <String, dynamic>{
+      'dayNumber': instance.dayNumber,
+      'meals': instance.meals.map((e) => e.toJson()).toList(),
+    };
+
+MealItem _$MealItemFromJson(Map<String, dynamic> json) => MealItem(
+  type: json['type'] as String,
+  calories: (json['calories'] as num).toInt(),
+  nutrition: MealNutrition.fromJson(json['nutrition'] as Map<String, dynamic>),
+  foods: (json['foods'] as List<dynamic>)
+      .map((e) => MealFood.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$MealItemToJson(MealItem instance) => <String, dynamic>{
+  'type': instance.type,
+  'calories': instance.calories,
+  'nutrition': instance.nutrition.toJson(),
+  'foods': instance.foods.map((e) => e.toJson()).toList(),
+};
+
+MealNutrition _$MealNutritionFromJson(Map<String, dynamic> json) =>
+    MealNutrition(
+      carbs: (json['carbs'] as num).toDouble(),
+      protein: (json['protein'] as num).toDouble(),
+      fat: (json['fat'] as num).toDouble(),
+      fiber: (json['fiber'] as num).toDouble(),
+      sugar: (json['sugar'] as num).toDouble(),
+    );
+
+Map<String, dynamic> _$MealNutritionToJson(MealNutrition instance) =>
+    <String, dynamic>{
+      'carbs': instance.carbs,
+      'protein': instance.protein,
+      'fat': instance.fat,
+      'fiber': instance.fiber,
+      'sugar': instance.sugar,
+    };
+
+MealFood _$MealFoodFromJson(Map<String, dynamic> json) => MealFood(
+  name: json['name'] as String,
+  quantity: json['quantity'] as String,
+);
+
+Map<String, dynamic> _$MealFoodToJson(MealFood instance) => <String, dynamic>{
+  'name': instance.name,
+  'quantity': instance.quantity,
+};

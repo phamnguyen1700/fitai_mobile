@@ -45,4 +45,9 @@ class ApiConstants {
 
   //chat
   static const String chatThreads = '/chatthreads';
+  static const String aiHealthPlanCreate = '/api/aihealthplan/create';
+
+  //daily
+  static const String dailyMeals = '/mealplan/daily-meals';
+  static const String mealPlanGenerate = '/api/mealplan/generate';
 }

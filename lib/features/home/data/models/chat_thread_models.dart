@@ -121,7 +121,7 @@ class CreateChatThreadData {
 
 /// Body gửi:
 /// {
-///   "role": "customer",
+///   "role": "user",
 ///   "content": "string",
 ///   "data": "string"
 /// }
@@ -132,7 +132,7 @@ class SendChatMessageRequest {
   final String? data;
 
   SendChatMessageRequest({
-    this.role = 'customer',
+    this.role = 'user',
     required this.content,
     this.data,
   });
@@ -238,4 +238,228 @@ class ChatMessageMeta {
       _$ChatMessageMetaFromJson(json);
 
   Map<String, dynamic> toJson() => _$ChatMessageMetaToJson(this);
+}
+
+/// =======================
+/// GET /chatthreads/{threadId}/messages
+/// =======================
+
+/// Response dạng:
+/// {
+///   "data": [ {..ChatMessage..}, ... ],
+///   "success": true,
+///   "message": "string"
+/// }
+@JsonSerializable(explicitToJson: true)
+class GetChatMessagesResponse {
+  final List<ChatMessage> data;
+  final bool success;
+  final String message;
+
+  GetChatMessagesResponse({
+    required this.data,
+    required this.success,
+    required this.message,
+  });
+
+  factory GetChatMessagesResponse.fromJson(Map<String, dynamic> json) =>
+      _$GetChatMessagesResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$GetChatMessagesResponseToJson(this);
+}
+
+// =======================
+// POST /api/aihealthplan/create
+// =======================
+
+@JsonSerializable()
+class AiHealthPlanCreateRequest {
+  final int activityLevel;
+  final int experienceLevel;
+  final String healthProblem;
+  final String goal;
+  final int nextCheckPoint;
+  final int workoutDays;
+  final String importantNote;
+  final int dietType;
+
+  AiHealthPlanCreateRequest({
+    required this.activityLevel,
+    required this.experienceLevel,
+    required this.healthProblem,
+    required this.goal,
+    required this.nextCheckPoint,
+    required this.workoutDays,
+    required this.importantNote,
+    required this.dietType,
+  });
+
+  /// tiện: tạo request trực tiếp từ ChatMessageMeta
+  factory AiHealthPlanCreateRequest.fromMeta(ChatMessageMeta meta) {
+    return AiHealthPlanCreateRequest(
+      activityLevel: meta.activityLevel,
+      experienceLevel: meta.experienceLevel,
+      healthProblem: meta.healthProblem,
+      goal: meta.goal,
+      nextCheckPoint: meta.nextCheckPoint,
+      workoutDays: meta.workoutDays,
+      importantNote: meta.importantNote,
+      dietType: meta.dietType,
+    );
+  }
+
+  factory AiHealthPlanCreateRequest.fromJson(Map<String, dynamic> json) =>
+      _$AiHealthPlanCreateRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AiHealthPlanCreateRequestToJson(this);
+}
+
+/// tuỳ backend, ở đây mình chỉ cần success + message là đủ
+@JsonSerializable()
+class AiHealthPlanCreateResponse {
+  final bool success;
+  final String message;
+
+  AiHealthPlanCreateResponse({required this.success, required this.message});
+
+  factory AiHealthPlanCreateResponse.fromJson(Map<String, dynamic> json) =>
+      _$AiHealthPlanCreateResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AiHealthPlanCreateResponseToJson(this);
+}
+
+/// =======================
+/// POST /api/mealplan/generate
+/// =======================
+/// Response tổng:
+/// {
+///   "data": { ...MealPlanGenerateData },
+///   "success": true,
+///   "message": "Meal plan generated successfully"
+/// }
+@JsonSerializable(explicitToJson: true)
+class MealPlanGenerateResponse {
+  final MealPlanGenerateData data;
+  final bool success;
+  final String message;
+
+  MealPlanGenerateResponse({
+    required this.data,
+    required this.success,
+    required this.message,
+  });
+
+  factory MealPlanGenerateResponse.fromJson(Map<String, dynamic> json) =>
+      _$MealPlanGenerateResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealPlanGenerateResponseToJson(this);
+}
+
+/// "data" bên trong:
+/// {
+///   "processingTime": "00:01:24.4743742",
+///   "targetCalories": 2816,
+///   "data": { "dailyMeals": [ ... ] }
+/// }
+@JsonSerializable(explicitToJson: true)
+class MealPlanGenerateData {
+  final String processingTime;
+  final int targetCalories;
+  final MealPlanCoreData data;
+
+  MealPlanGenerateData({
+    required this.processingTime,
+    required this.targetCalories,
+    required this.data,
+  });
+
+  factory MealPlanGenerateData.fromJson(Map<String, dynamic> json) =>
+      _$MealPlanGenerateDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealPlanGenerateDataToJson(this);
+}
+
+/// Lớp chứa mảng dailyMeals
+@JsonSerializable(explicitToJson: true)
+class MealPlanCoreData {
+  final List<DailyMealPlan> dailyMeals;
+
+  MealPlanCoreData({required this.dailyMeals});
+
+  factory MealPlanCoreData.fromJson(Map<String, dynamic> json) =>
+      _$MealPlanCoreDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealPlanCoreDataToJson(this);
+}
+
+/// 1 ngày trong plan
+@JsonSerializable(explicitToJson: true)
+class DailyMealPlan {
+  final int dayNumber;
+  final List<MealItem> meals;
+
+  DailyMealPlan({required this.dayNumber, required this.meals});
+
+  factory DailyMealPlan.fromJson(Map<String, dynamic> json) =>
+      _$DailyMealPlanFromJson(json);
+
+  Map<String, dynamic> toJson() => _$DailyMealPlanToJson(this);
+}
+
+/// 1 bữa ăn (Breakfast / Lunch / Dinner / Snack...)
+@JsonSerializable(explicitToJson: true)
+class MealItem {
+  final String type;
+  final int calories;
+  final MealNutrition nutrition;
+  final List<MealFood> foods;
+
+  MealItem({
+    required this.type,
+    required this.calories,
+    required this.nutrition,
+    required this.foods,
+  });
+
+  factory MealItem.fromJson(Map<String, dynamic> json) =>
+      _$MealItemFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealItemToJson(this);
+}
+
+/// Thông tin macro cho 1 bữa
+@JsonSerializable()
+class MealNutrition {
+  final double carbs;
+  final double protein;
+  final double fat;
+  final double fiber;
+  final double sugar;
+
+  MealNutrition({
+    required this.carbs,
+    required this.protein,
+    required this.fat,
+    required this.fiber,
+    required this.sugar,
+  });
+
+  factory MealNutrition.fromJson(Map<String, dynamic> json) =>
+      _$MealNutritionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealNutritionToJson(this);
+}
+
+/// Thực phẩm cụ thể trong bữa
+@JsonSerializable()
+class MealFood {
+  final String name;
+  final String quantity;
+
+  MealFood({required this.name, required this.quantity});
+
+  factory MealFood.fromJson(Map<String, dynamic> json) =>
+      _$MealFoodFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealFoodToJson(this);
 }
