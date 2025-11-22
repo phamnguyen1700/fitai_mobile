@@ -530,12 +530,12 @@ class _ThreadMessagesProviderElement
   String get threadId => (origin as ThreadMessagesProvider).threadId;
 }
 
-String _$mealPlanGenerateHash() => r'bf6644a8bb5f9807b475d3b75e5ccf705733f001';
+String _$mealPlanGenerateHash() => r'd631bd9a16db8b91c7a6f3fd2739a25977b29e26';
 
 /// See also [mealPlanGenerate].
 @ProviderFor(mealPlanGenerate)
 final mealPlanGenerateProvider =
-    AutoDisposeFutureProvider<MealPlanGenerateResponse>.internal(
+    FutureProvider<MealPlanGenerateResponse>.internal(
       mealPlanGenerate,
       name: r'mealPlanGenerateProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -547,30 +547,63 @@ final mealPlanGenerateProvider =
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef MealPlanGenerateRef =
-    AutoDisposeFutureProviderRef<MealPlanGenerateResponse>;
+typedef MealPlanGenerateRef = FutureProviderRef<MealPlanGenerateResponse>;
 String _$mealPlanDailyMealsHash() =>
-    r'c2fe74bc4913fa7347e41305b035aa1f271bc345';
+    r'd96e85f355cd528bc199d1f69e711fa29d274d21';
 
-/// Nếu UI chỉ cần list DailyMealPlan cho phần preview
-///
-/// Copied from [mealPlanDailyMeals].
+/// See also [mealPlanDailyMeals].
 @ProviderFor(mealPlanDailyMeals)
-final mealPlanDailyMealsProvider =
-    AutoDisposeFutureProvider<List<DailyMealPlan>>.internal(
-      mealPlanDailyMeals,
-      name: r'mealPlanDailyMealsProvider',
+final mealPlanDailyMealsProvider = FutureProvider<List<DailyMealPlan>>.internal(
+  mealPlanDailyMeals,
+  name: r'mealPlanDailyMealsProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$mealPlanDailyMealsHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MealPlanDailyMealsRef = FutureProviderRef<List<DailyMealPlan>>;
+String _$workoutPlanGenerateHash() =>
+    r'b189a8f697b893a4a661b267d46217f9bfcb6e62';
+
+/// See also [workoutPlanGenerate].
+@ProviderFor(workoutPlanGenerate)
+final workoutPlanGenerateProvider =
+    FutureProvider<WorkoutPlanGenerateResponse>.internal(
+      workoutPlanGenerate,
+      name: r'workoutPlanGenerateProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
           ? null
-          : _$mealPlanDailyMealsHash,
+          : _$workoutPlanGenerateHash,
       dependencies: null,
       allTransitiveDependencies: null,
     );
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef MealPlanDailyMealsRef =
-    AutoDisposeFutureProviderRef<List<DailyMealPlan>>;
+typedef WorkoutPlanGenerateRef = FutureProviderRef<WorkoutPlanGenerateResponse>;
+String _$workoutPlanDaysHash() => r'3ca835029d7044cc1f389bdc6fb2865dc4b13c4a';
+
+/// Chỉ cần danh sách các ngày (dayNumber, sessionName, exercises)
+///
+/// Copied from [workoutPlanDays].
+@ProviderFor(workoutPlanDays)
+final workoutPlanDaysProvider = FutureProvider<List<WorkoutPlanDay>>.internal(
+  workoutPlanDays,
+  name: r'workoutPlanDaysProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$workoutPlanDaysHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef WorkoutPlanDaysRef = FutureProviderRef<List<WorkoutPlanDay>>;
 String _$aiHealthPlanCreateControllerHash() =>
     r'43fed9cff8462a81072e66a4fbc77c4ee4110d2b';
 

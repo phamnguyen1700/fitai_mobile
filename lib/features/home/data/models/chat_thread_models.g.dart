@@ -325,3 +325,94 @@ Map<String, dynamic> _$MealFoodToJson(MealFood instance) => <String, dynamic>{
   'name': instance.name,
   'quantity': instance.quantity,
 };
+
+WorkoutPlanGenerateResponse _$WorkoutPlanGenerateResponseFromJson(
+  Map<String, dynamic> json,
+) => WorkoutPlanGenerateResponse(
+  data: WorkoutPlanGenerateData.fromJson(json['data'] as Map<String, dynamic>),
+  success: json['success'] as bool,
+  message: json['message'] as String,
+);
+
+Map<String, dynamic> _$WorkoutPlanGenerateResponseToJson(
+  WorkoutPlanGenerateResponse instance,
+) => <String, dynamic>{
+  'data': instance.data.toJson(),
+  'success': instance.success,
+  'message': instance.message,
+};
+
+WorkoutPlanGenerateData _$WorkoutPlanGenerateDataFromJson(
+  Map<String, dynamic> json,
+) => WorkoutPlanGenerateData(
+  success: json['success'] as bool,
+  errorMessage: json['errorMessage'] as String,
+  processingTime: json['processingTime'] as String,
+  goal: json['goal'] as String,
+  activityLevel: (json['activityLevel'] as num).toInt(),
+  data: WorkoutPlanCoreData.fromJson(json['data'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$WorkoutPlanGenerateDataToJson(
+  WorkoutPlanGenerateData instance,
+) => <String, dynamic>{
+  'success': instance.success,
+  'errorMessage': instance.errorMessage,
+  'processingTime': instance.processingTime,
+  'goal': instance.goal,
+  'activityLevel': instance.activityLevel,
+  'data': instance.data.toJson(),
+};
+
+WorkoutPlanCoreData _$WorkoutPlanCoreDataFromJson(Map<String, dynamic> json) =>
+    WorkoutPlanCoreData(
+      workoutPlan: (json['workoutPlan'] as List<dynamic>)
+          .map((e) => WorkoutPlanDay.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$WorkoutPlanCoreDataToJson(
+  WorkoutPlanCoreData instance,
+) => <String, dynamic>{
+  'workoutPlan': instance.workoutPlan.map((e) => e.toJson()).toList(),
+};
+
+WorkoutPlanDay _$WorkoutPlanDayFromJson(Map<String, dynamic> json) =>
+    WorkoutPlanDay(
+      dayNumber: (json['dayNumber'] as num).toInt(),
+      sessionName: json['sessionName'] as String,
+      exercises: (json['exercises'] as List<dynamic>)
+          .map((e) => WorkoutExercise.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+
+Map<String, dynamic> _$WorkoutPlanDayToJson(WorkoutPlanDay instance) =>
+    <String, dynamic>{
+      'dayNumber': instance.dayNumber,
+      'sessionName': instance.sessionName,
+      'exercises': instance.exercises.map((e) => e.toJson()).toList(),
+    };
+
+WorkoutExercise _$WorkoutExerciseFromJson(Map<String, dynamic> json) =>
+    WorkoutExercise(
+      exerciseId: json['exerciseId'] as String,
+      name: json['name'] as String,
+      sets: (json['sets'] as num?)?.toInt(),
+      reps: (json['reps'] as num?)?.toInt(),
+      durationMinutes: (json['durationMinutes'] as num?)?.toInt(),
+      category: json['category'] as String,
+      videoUrl: json['videoUrl'] as String,
+      note: json['note'] as String,
+    );
+
+Map<String, dynamic> _$WorkoutExerciseToJson(WorkoutExercise instance) =>
+    <String, dynamic>{
+      'exerciseId': instance.exerciseId,
+      'name': instance.name,
+      'sets': instance.sets,
+      'reps': instance.reps,
+      'durationMinutes': instance.durationMinutes,
+      'category': instance.category,
+      'videoUrl': instance.videoUrl,
+      'note': instance.note,
+    };

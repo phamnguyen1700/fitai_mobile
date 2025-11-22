@@ -7,9 +7,9 @@ class BodyCompositionDonut extends StatelessWidget {
     required this.fatPercent,
     required this.musclePercent,
     required this.bonePercent,
-    this.size = 150, // ✅ giảm từ 180 → 150
+    this.size = 150,
     this.sectionSpace = 2,
-    this.centerHole = 38, // ✅ tăng lỗ giữa để donut mỏng hơn
+    this.centerHole = 38,
     this.showLegend = true,
   });
 

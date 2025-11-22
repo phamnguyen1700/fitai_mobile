@@ -10,11 +10,13 @@ MealPlanRepository mealPlanRepository(MealPlanRepositoryRef ref) {
   return MealPlanRepository();
 }
 
-/// Ngày hiện tại (1–7)
 @riverpod
 class CurrentDay extends _$CurrentDay {
   @override
-  int build() => 1;
+  int build() {
+    final now = DateTime.now();
+    return now.weekday;
+  }
 
   void set(int value) => state = value;
 }

@@ -1,7 +1,13 @@
+import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:fitai_mobile/features/daily/data/models/meal_plan_models.dart';
+import 'package:fitai_mobile/features/daily/data/repositories/meal_photo_repository.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:fitai_mobile/features/daily/presentation/viewmodels/meal_comment_providers.dart';
 
 class TodayMealPlan extends StatefulWidget {
   const TodayMealPlan({
@@ -9,11 +15,13 @@ class TodayMealPlan extends StatefulWidget {
     required this.day,
     this.shrinkWrap = false,
     this.physics,
+    this.onReload,
   });
 
   final MealDayData day;
   final bool shrinkWrap;
   final ScrollPhysics? physics;
+  final VoidCallback? onReload;
 
   @override
   State<TodayMealPlan> createState() => _TodayMealPlanState();
@@ -25,8 +33,11 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
   late PageController _pageController;
   int _currentIndex = 0;
 
-  // lưu chiều cao thực tế của từng card
-  late List<double> _heights;
+  /// Chiều cao thực tế cho từng meal (index theo PageView)
+  List<double> _mealHeights = const [];
+
+  final _mealPhotoRepo = MealPhotoRepository();
+  bool _isUploading = false;
 
   @override
   void initState() {
@@ -36,8 +47,21 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
   }
 
   void _initHeights() {
-    final len = widget.day.meals.length;
-    _heights = List<double>.filled(len > 0 ? len : 1, 0);
+    final meals = widget.day.meals;
+    final len = meals.length;
+    _mealHeights = List<double>.filled(len > 0 ? len : 1, 0);
+    _currentIndex = 0;
+  }
+
+  /// callback đo size giống workout
+  void _onMealSize(int index, Size size) {
+    if (index >= _mealHeights.length) return;
+    final h = size.height;
+    if (_mealHeights[index] == h) return;
+
+    setState(() {
+      _mealHeights[index] = h;
+    });
   }
 
   @override
@@ -46,7 +70,7 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
     if (oldWidget.day != widget.day) {
       _currentIndex = 0;
       _pageController.jumpToPage(0);
-      _initHeights();
+      _initHeights(); // ngày khác → tính lại chiều cao
     }
   }
 
@@ -56,14 +80,54 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
     super.dispose();
   }
 
-  void _onCardSize(int index, Size size) {
-    if (index >= _heights.length) return;
-    final h = size.height;
-    if (_heights[index] == h) return;
+  /// Upload ảnh + mark completed
+  Future<void> _handleUploadPhoto(MealEntry entry) async {
+    if (_isUploading) return;
 
-    setState(() {
-      _heights[index] = h;
-    });
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+
+    if (picked == null) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final file = File(picked.path);
+
+      final res = await _mealPhotoRepo.uploadAndComplete(
+        dayNumber: widget.day.dayNumber,
+        mealType: entry.meal.type,
+        photoFile: file,
+      );
+
+      debugPrint(
+        '[TodayMealPlan] upload result: ${res.success} - ${res.message}',
+      );
+
+      if (res.success) {
+        widget.onReload?.call();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(res.message)));
+        }
+      }
+    } catch (e, st) {
+      debugPrint('[TodayMealPlan] upload error: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Upload ảnh bữa ăn thất bại')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
   }
 
   @override
@@ -73,7 +137,6 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
 
     final meals = widget.day.meals;
 
-    // Không có bữa nào
     if (meals.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -92,7 +155,7 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
                 'Thực đơn hôm nay',
                 style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
               Center(
                 child: Text(
                   'Chưa có thực đơn cho hôm nay.',
@@ -106,11 +169,16 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
       );
     }
 
-    // nếu chưa đo được thì dùng minHeight
+    // Phòng trường hợp hot-reload làm _mealHeights lệch length
+    if (_mealHeights.length != meals.length) {
+      _initHeights();
+    }
+
     final currentHeight =
-        (_currentIndex < _heights.length && _heights[_currentIndex] > 0)
-        ? _heights[_currentIndex]
+        (_currentIndex < _mealHeights.length && _mealHeights[_currentIndex] > 0)
+        ? _mealHeights[_currentIndex]
         : _minHeight;
+
     final double targetHeight = max(currentHeight, _minHeight).toDouble();
 
     return Padding(
@@ -126,32 +194,32 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🟧 TITLE
             Text(
               'Thực đơn hôm nay',
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 8),
-
-            // 🔹 Tổng quan (bar macro)
             _DailySummaryCard(day: widget.day),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
 
-            // 🔸 Đo chiều cao thật của từng thẻ (ẩn, không hiển thị)
+            // Đo size thật giống workout — đo cả card + ảnh + comment
             Offstage(
               offstage: true,
               child: Column(
                 children: [
                   for (int i = 0; i < meals.length; i++)
-                    MeasureSize(
-                      onChange: (size) => _onCardSize(i, size),
-                      child: _MealTodoCard(entry: meals[i]),
+                    _MeasureSize(
+                      key: ValueKey('meal-${i}-${meals[i].meal.type}'),
+                      onChange: (size) => _onMealSize(i, size),
+                      child: _MealPage(
+                        entry: meals[i],
+                        onUploadPhoto: _handleUploadPhoto,
+                      ),
                     ),
                 ],
               ),
             ),
 
-            // 🔸 Các bữa ăn – cao đúng bằng nội dung đo được
+            // Card meal swipe (card + ảnh + comment swipe chung)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeInOut,
@@ -164,15 +232,17 @@ class _TodayMealPlanState extends State<TodayMealPlan> {
                 },
                 itemBuilder: (context, index) {
                   final entry = meals[index];
-                  // KHÔNG dùng MeasureSize ở đây nữa
-                  return _MealTodoCard(entry: entry);
+                  return _MealPage(
+                    entry: entry,
+                    onUploadPhoto: _handleUploadPhoto,
+                  );
                 },
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
 
-            // 🔹 dots indicator
+            /// Dots indicator
             Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -230,7 +300,7 @@ class _DailySummaryCard extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Text(
                       'Chưa có dữ liệu macro',
-                      style: t.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   )
                 : Row(
@@ -244,7 +314,7 @@ class _DailySummaryCard extends StatelessWidget {
                             alignment: Alignment.center,
                             child: Text(
                               'Carb · ${carbs.toInt()}g',
-                              style: t.labelSmall?.copyWith(
+                              style: t.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w500,
                                 color: Colors.black87,
                               ),
@@ -261,7 +331,7 @@ class _DailySummaryCard extends StatelessWidget {
                             alignment: Alignment.center,
                             child: Text(
                               'Protein · ${protein.toInt()}g',
-                              style: t.labelSmall?.copyWith(
+                              style: t.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w500,
                                 color: Colors.black87,
                               ),
@@ -278,7 +348,7 @@ class _DailySummaryCard extends StatelessWidget {
                             alignment: Alignment.center,
                             child: Text(
                               'Fat · ${fat.toInt()}g',
-                              style: t.labelSmall?.copyWith(
+                              style: t.bodySmall?.copyWith(
                                 fontWeight: FontWeight.w500,
                                 color: Colors.black87,
                               ),
@@ -290,9 +360,7 @@ class _DailySummaryCard extends StatelessWidget {
                   ),
           ),
         ),
-
-        const SizedBox(height: 8),
-
+        const SizedBox(height: 4),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
@@ -308,13 +376,14 @@ class _DailySummaryCard extends StatelessWidget {
   }
 }
 
-/// Card từng bữa ăn (Breakfast / Lunch / Dinner...)
+/// Card từng bữa ăn
 class _MealTodoCard extends StatelessWidget {
   const _MealTodoCard({required this.entry, this.onUploadPhoto});
 
-  final MealEntry entry;
+  static const double kPhotoHeight = 200;
+  static const double kCommentSectionHeight = 220; // dùng cho comment
 
-  /// callback upload ảnh – optional
+  final MealEntry entry;
   final Future<void> Function(MealEntry entry)? onUploadPhoto;
 
   @override
@@ -343,24 +412,22 @@ class _MealTodoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ===== Header =====
+          /// Header
           Row(
             children: [
               Expanded(
                 child: Text(
                   meal.type,
-                  style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
-
-              // nếu đã hoàn thành → hiển thị tick
               if (isCompleted)
                 Icon(Icons.check_circle, color: cs.primary, size: 18),
             ],
           ),
           const SizedBox(height: 6),
 
-          // ===== Macro bữa ăn: C/P/F + kcal =====
+          /// Macro
           Row(
             children: [
               Expanded(
@@ -371,79 +438,34 @@ class _MealTodoCard extends StatelessWidget {
                     _MacroDot(
                       color: Colors.orangeAccent,
                       label: 'Carb: $carbs g',
-                      textStyle: t.bodySmall,
                     ),
                     _MacroDot(
                       color: Colors.lightGreenAccent,
                       label: 'Protein: $protein g',
-                      textStyle: t.bodySmall,
                     ),
-                    _MacroDot(
-                      color: Colors.cyanAccent,
-                      label: 'Fat: $fat g',
-                      textStyle: t.bodySmall,
-                    ),
+                    _MacroDot(color: Colors.cyanAccent, label: 'Fat: $fat g'),
                   ],
                 ),
               ),
-              _MacroDot(
-                color: cs.primary,
-                label: '$kcal kcal',
-                textStyle: t.bodySmall,
-              ),
+              _MacroDot(color: cs.primary, label: '$kcal kcal'),
             ],
           ),
 
-          const SizedBox(height: 10),
-          Divider(color: cs.outlineVariant, height: 16),
+          const SizedBox(height: 5),
+          Divider(color: cs.surfaceContainerHigh, height: 8),
+          const SizedBox(height: 5),
 
-          // ===== Danh sách món ăn trong bữa =====
+          /// Foods
           _MealFoodsTable(foods: meal.foods),
           const SizedBox(height: 12),
 
-          // ===== Nếu có ảnh → hiển thị ảnh =====
-          if (photoUrl != null && photoUrl.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                photoUrl,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          // ===== Nếu chưa có ảnh → render nút upload =====
+          /// Upload photo
           if (photoUrl == null || photoUrl.isEmpty)
             Align(
-              alignment: Alignment.centerRight,
+              alignment: Alignment.bottomRight,
               child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  minimumSize: Size.zero,
-                ),
                 onPressed: () async {
-                  if (onUploadPhoto != null) {
-                    await onUploadPhoto!(entry);
-                    return;
-                  }
-
-                  // Default: pick image from gallery
-                  final picker = ImagePicker();
-                  final file = await picker.pickImage(
-                    source: ImageSource.gallery,
-                    imageQuality: 85,
-                  );
-                  if (file != null) {
-                    debugPrint('[MealTodoCard] Picked image: ${file.path}');
-                    // TODO: gọi repo upload meal photo
-                  }
+                  if (onUploadPhoto != null) await onUploadPhoto!(entry);
                 },
                 icon: Icon(
                   Icons.photo_camera_outlined,
@@ -465,7 +487,43 @@ class _MealTodoCard extends StatelessWidget {
   }
 }
 
-/// Bảng món ăn trong bữa
+/// Một trang meal: card + ảnh + comment, dùng cho cả PageView & đo size
+class _MealPage extends StatelessWidget {
+  const _MealPage({required this.entry, required this.onUploadPhoto});
+
+  final MealEntry entry;
+  final Future<void> Function(MealEntry entry) onUploadPhoto;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = entry.photoUrl != null && entry.photoUrl!.isNotEmpty;
+    final hasComment = entry.mealLogId?.isNotEmpty ?? false;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _MealTodoCard(entry: entry, onUploadPhoto: onUploadPhoto),
+        if (hasPhoto) ...[
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              entry.photoUrl!,
+              height: _MealTodoCard.kPhotoHeight,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+        ],
+        if (hasComment) ...[
+          const SizedBox(height: 8),
+          _MealPhotoCommentsSection(mealLogId: entry.mealLogId!),
+        ],
+      ],
+    );
+  }
+}
+
 class _MealFoodsTable extends StatelessWidget {
   const _MealFoodsTable({required this.foods});
 
@@ -488,7 +546,7 @@ class _MealFoodsTable extends StatelessWidget {
       children: [
         for (final food in foods)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: 1),
             child: Row(
               children: [
                 Expanded(child: Text(food.name, style: t.bodySmall)),
@@ -505,55 +563,325 @@ class _MealFoodsTable extends StatelessWidget {
 }
 
 class _MacroDot extends StatelessWidget {
-  const _MacroDot({required this.color, required this.label, this.textStyle});
+  const _MacroDot({required this.color, required this.label});
 
   final Color color;
   final String label;
-  final TextStyle? textStyle;
 
   @override
   Widget build(BuildContext context) {
+    final t = Theme.of(context).textTheme;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
-        Text(label, style: textStyle),
+        Text(label, style: t.bodySmall),
       ],
     );
   }
 }
 
-/// ===== Helper đo size child để set chiều cao đúng =====
+/// Comment cho ảnh bữa ăn – dùng API thật
+class _MealPhotoCommentsSection extends StatefulWidget {
+  const _MealPhotoCommentsSection({required this.mealLogId});
+
+  final String mealLogId;
+
+  @override
+  State<_MealPhotoCommentsSection> createState() =>
+      _MealPhotoCommentsSectionState();
+}
+
+class _MealPhotoCommentsSectionState extends State<_MealPhotoCommentsSection> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.mealLogId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    return Consumer(
+      builder: (context, ref, _) {
+        final commentsAsync = ref.watch(
+          mealCommentsControllerProvider(widget.mealLogId),
+        );
+
+        final hasComments = commentsAsync.maybeWhen(
+          data: (data) => data.comments.isNotEmpty,
+          orElse: () => false,
+        );
+        final isLoading = commentsAsync.isLoading;
+
+        const double collapsedHeight = 110; // khi chưa có cmt
+        const double expandedHeight =
+            _MealTodoCard.kCommentSectionHeight; // 220
+
+        final double targetHeight = isLoading
+            ? collapsedHeight
+            : (hasComments ? expandedHeight : collapsedHeight);
+
+        Future<void> handleSend() async {
+          final raw = _controller.text.trim();
+          if (raw.isEmpty) return;
+
+          final notifier = ref.read(
+            mealCommentsControllerProvider(widget.mealLogId).notifier,
+          );
+
+          await notifier.addComment(raw);
+          _controller.clear();
+        }
+
+        Future<void> handleDelete(String commentId) async {
+          final notifier = ref.read(
+            mealCommentsControllerProvider(widget.mealLogId).notifier,
+          );
+          await notifier.deleteComment(commentId);
+        }
+
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          height: targetHeight,
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+          decoration: BoxDecoration(
+            color: cs.surface.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// Title
+              Text(
+                'Nhận xét về bữa ăn',
+                style: t.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+              const SizedBox(height: 3),
+
+              /// Vùng comment chiếm phần còn lại, bên trong có scroll
+              Expanded(
+                child: commentsAsync.when(
+                  loading: () => Row(
+                    children: [
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.6,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Đang tải nhận xét...',
+                        style: t.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  error: (e, _) => Text(
+                    'Không tải được nhận xét',
+                    style: t.bodySmall?.copyWith(color: cs.error),
+                  ),
+                  data: (data) {
+                    final comments = data.comments;
+
+                    if (comments.isEmpty) {
+                      return Align(
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          'Chưa có nhận xét nào.',
+                          style: t.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      );
+                    }
+
+                    final items = comments.map((c) {
+                      final isAdvisor =
+                          (c.senderType ?? '').toLowerCase() == 'advisor';
+                      final bubbleColor = isAdvisor
+                          ? cs.tertiaryContainer
+                          : cs.surfaceVariant;
+                      final textColor = isAdvisor
+                          ? cs.onTertiaryContainer
+                          : cs.onSurface;
+                      final icon = isAdvisor
+                          ? Icons.psychology_alt_outlined
+                          : Icons.person_outline;
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              icon,
+                              size: 16,
+                              color: isAdvisor
+                                  ? cs.tertiary
+                                  : cs.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: bubbleColor,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            c.senderName ?? 'Ẩn danh',
+                                            style: t.labelSmall?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: textColor.withOpacity(0.9),
+                                            ),
+                                          ),
+                                        ),
+                                        if (c.id != null)
+                                          InkWell(
+                                            onTap: () => handleDelete(c.id!),
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              size: 14,
+                                              color: textColor.withOpacity(0.6),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      c.content ?? '',
+                                      style: t.bodySmall?.copyWith(
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList();
+
+                    return SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: items,
+                      ),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 4),
+
+              /// Input gửi comment
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: t.bodySmall,
+                      decoration: InputDecoration(
+                        hintText: 'Gửi nhận xét về bữa ăn...',
+                        hintStyle: t.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        filled: true,
+                        fillColor: cs.surfaceContainerHighest,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide(color: cs.outlineVariant),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide(color: cs.outlineVariant),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          borderSide: BorderSide(color: cs.primary, width: 1.2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: Icon(Icons.send_rounded, size: 18, color: cs.primary),
+                    onPressed: handleSend,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 typedef OnWidgetSizeChange = void Function(Size size);
 
-class MeasureSize extends StatefulWidget {
-  const MeasureSize({super.key, required this.onChange, required this.child});
+class _MeasureSize extends StatefulWidget {
+  const _MeasureSize({Key? key, required this.onChange, required this.child})
+    : super(key: key);
 
   final OnWidgetSizeChange onChange;
   final Widget child;
 
   @override
-  State<MeasureSize> createState() => _MeasureSizeState();
+  State<_MeasureSize> createState() => _MeasureSizeState();
 }
 
-class _MeasureSizeState extends State<MeasureSize> {
-  Size? _oldSize;
-
+class _MeasureSizeState extends State<_MeasureSize> {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ro = context.findRenderObject();
       if (ro is RenderBox) {
         final newSize = ro.size;
-        if (_oldSize == null || _oldSize != newSize) {
-          _oldSize = newSize;
-          widget.onChange(newSize);
-        }
+        widget.onChange(newSize);
       }
     });
 

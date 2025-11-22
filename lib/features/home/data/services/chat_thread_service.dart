@@ -94,4 +94,19 @@ class ChatThreadService {
     final res = await generateMealPlanRaw();
     return MealPlanGenerateResponse.fromJson(res.data as Map<String, dynamic>);
   }
+
+  // ========== WORKOUT PLAN: POST /api/workoutplan/generate ==========
+  /// Raw: gọi generate workout plan
+  Future<Response<dynamic>> generateWorkoutPlanRaw() {
+    // Tương tự meal plan: endpoint không có body
+    return _client.post<dynamic>(ApiConstants.workoutPlanGenerate);
+  }
+
+  /// Typed: parse về WorkoutPlanGenerateResponse
+  Future<WorkoutPlanGenerateResponse> generateWorkoutPlan() async {
+    final res = await generateWorkoutPlanRaw();
+    return WorkoutPlanGenerateResponse.fromJson(
+      res.data as Map<String, dynamic>,
+    );
+  }
 }
