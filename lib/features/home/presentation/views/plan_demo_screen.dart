@@ -154,11 +154,6 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
                           : null;
 
                       final featuredTitle = first?.name ?? '—';
-                      final featuredMeta = _meta(
-                        first?.sets,
-                        first?.reps,
-                        first?.minutes,
-                      );
                       final totalExercises = d.exercises.length;
 
                       return Padding(
@@ -169,7 +164,6 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
                         child: WorkoutDayCard(
                           dayTitle: d.dayName,
                           featuredTitle: featuredTitle,
-                          featuredMeta: featuredMeta,
                           totalExercises: totalExercises,
                           isSelected: i == _dayIndex,
                           onTap: () => setState(() => _dayIndex = i),
@@ -183,7 +177,7 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
                     itemCount: plan.days[_dayIndex].exercises.length,
                     itemBuilder: (_, i) {
                       final e = plan.days[_dayIndex].exercises[i];
-                      return ExerciseVideoTile(
+                      return ExerciseVideo(
                         title: e.name ?? 'Bài tập',
                         thumbUrl: e.videoUrl ?? '',
                         category: e.category?.name ?? '—',
@@ -296,11 +290,6 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
             final first = d.exercises.isNotEmpty ? d.exercises.first : null;
 
             final featuredTitle = first?.name ?? '—';
-            final featuredMeta = _meta(
-              first?.sets,
-              first?.reps,
-              first?.minutes,
-            );
             final totalExercises = d.exercises.length;
 
             return Padding(
@@ -308,7 +297,6 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
               child: WorkoutDayCard(
                 dayTitle: d.dayName,
                 featuredTitle: featuredTitle,
-                featuredMeta: featuredMeta,
                 totalExercises: totalExercises,
                 isSelected: i == _dayIndex,
                 onTap: () => setState(() => _dayIndex = i),
@@ -322,7 +310,7 @@ class _PlanDemoBodyState extends State<PlanDemoBody> {
           itemCount: day.exercises.length,
           itemBuilder: (_, i) {
             final e = day.exercises[i];
-            return ExerciseVideoTile(
+            return ExerciseVideo(
               title: e.name ?? 'Bài tập',
               thumbUrl: e.videoUrl ?? '',
               category: e.category?.name ?? '—',

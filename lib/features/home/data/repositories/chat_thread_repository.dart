@@ -98,4 +98,24 @@ class ChatThreadRepository {
     final resp = await generateMealPlan();
     return resp.data.data.dailyMeals;
   }
+
+  // ==================== WORKOUT PLAN ====================
+  /// Gọi API /api/workoutplan/generate → trả về full response
+  Future<WorkoutPlanGenerateResponse> generateWorkoutPlan() async {
+    try {
+      final res = await _service.generateWorkoutPlanRaw();
+      final body = WorkoutPlanGenerateResponse.fromJson(
+        res.data as Map<String, dynamic>,
+      );
+      return body;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Nếu UI chỉ cần list workoutPlan (nguyên từng ngày)
+  Future<List<WorkoutPlanDay>> generateWorkoutPlanDays() async {
+    final resp = await generateWorkoutPlan();
+    return resp.data.data.workoutPlan;
+  }
 }

@@ -45,7 +45,7 @@ class HomeHostScreen extends ConsumerWidget {
 }
 
 //// =======================
-//// FREE PLAN – TEASER CARD
+/// FREE PLAN – TEASER CARD
 //// =======================
 class _FreePlanTeaser extends ConsumerWidget {
   const _FreePlanTeaser();
@@ -370,17 +370,18 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
 
   bool _showPlanCta = false;
 
-  bool _isGeneratingPlan = false;
-  double _planProgress = 0.0;
-  bool _planReady = false;
-  Timer? _planTimer;
+  /// NEW: trạng thái cho 2 plan
+  bool _isGeneratingWorkout = false;
+  bool _workoutDone = false;
+
+  bool _isGeneratingMeal = false;
+  bool _mealDone = false;
 
   final ScrollController _scrollController = ScrollController();
 
   @override
   void dispose() {
     _scrollController.dispose();
-    _planTimer?.cancel();
     super.dispose();
   }
 
@@ -389,80 +390,63 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
     super.initState();
   }
 
-  void _startPlanProgress() {
-    _planTimer?.cancel();
-    _planProgress = 0.0;
-
-    void tick(double target, Duration duration) {
-      final start = _planProgress;
-      final diff = target - start;
-      const step = Duration(milliseconds: 80);
-      int elapsed = 0;
-
-      _planTimer = Timer.periodic(step, (timer) {
-        elapsed += step.inMilliseconds;
-        final t = (elapsed / duration.inMilliseconds).clamp(0.0, 1.0);
-        setState(() {
-          _planProgress = start + diff * t;
-        });
-        if (t >= 1.0) timer.cancel();
-      });
-    }
-
-    tick(0.30, const Duration(seconds: 10));
-    Future.delayed(const Duration(seconds: 10), () {
-      if (!mounted || !_isGeneratingPlan) return;
-      tick(0.65, const Duration(seconds: 15));
-    });
-    Future.delayed(const Duration(seconds: 25), () {
-      if (!mounted || !_isGeneratingPlan) return;
-      tick(0.90, const Duration(seconds: 20));
-    });
-  }
-
+  /// Gọi lần lượt:
+  /// 1. generate workout plan
+  /// 2. generate meal plan
+  /// Cả 2 xong → cho phép "Xem plan"
   Future<void> _handleGetPlan() async {
-    // Nếu plan đã sẵn sàng → chuyển sang màn PlanPreview
-    if (_planReady && !_isGeneratingPlan) {
+    // Nếu cả 2 đã xong → nhảy sang màn preview
+    if (_workoutDone && _mealDone) {
       ref.read(homeViewProvider.notifier).state = HomeView.planPreview;
       return;
     }
 
-    // Đang generate thì bỏ qua
-    if (_isGeneratingPlan) return;
+    // Đang chạy cái gì đó thì bỏ qua để tránh spam
+    if (_isGeneratingWorkout || _isGeneratingMeal) return;
 
-    // Bắt đầu generate
-    setState(() {
-      _isGeneratingPlan = true;
-      _planReady = false;
-      _planProgress = 0.0;
-    });
-    _startPlanProgress();
+    // Bước 1: chưa có workout → generate workout trước
+    if (!_workoutDone) {
+      setState(() => _isGeneratingWorkout = true);
 
-    try {
-      final repo = ref.read(chatThreadRepositoryProvider);
+      try {
+        await ref.read(workoutPlanGenerateProvider.future);
+        if (!mounted) return;
+        setState(() {
+          _isGeneratingWorkout = false;
+          _workoutDone = true;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isGeneratingWorkout = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tạo lịch tập thất bại, thử lại sau nhé.'),
+          ),
+        );
+        return; // dừng, không chạy meal nữa
+      }
+    }
 
-      // GỌI API để tạo plan (chỉ để đảm bảo server đã generate xong)
-      await repo.generateMealPlan();
+    // Bước 2: workout xong rồi → generate meal
+    if (_workoutDone && !_mealDone) {
+      setState(() => _isGeneratingMeal = true);
 
-      if (!mounted) return;
-
-      // Kết thúc loading, báo plan sẵn sàng (Không chuyển màn)
-      setState(() {
-        _isGeneratingPlan = false;
-        _planReady = true;
-        _planProgress = 1.0;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      _planTimer?.cancel();
-      setState(() {
-        _isGeneratingPlan = false;
-        _planReady = false;
-        _planProgress = 0.0;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tạo plan thất bại, thử lại sau nhé.')),
-      );
+      try {
+        await ref.read(mealPlanGenerateProvider.future);
+        if (!mounted) return;
+        setState(() {
+          _isGeneratingMeal = false;
+          _mealDone = true;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isGeneratingMeal = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Tạo thực đơn thất bại, thử lại sau nhé.'),
+          ),
+        );
+      }
     }
   }
 
@@ -642,12 +626,7 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
                           );
                         }
 
-                        final hasPlanMetaInHistory = historyMessages.any(
-                          (m) => m.data != null,
-                        );
-
-                        final showPlanCta =
-                            hasPlanMetaInHistory || _showPlanCta;
+                        final showPlanCta = _showPlanCta && !_isSavingHealth;
 
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           if (_scrollController.hasClients) {
@@ -668,9 +647,11 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
                                 onGetPlan: _handleGetPlan,
                                 controller: _scrollController,
                                 isTyping: _isTyping,
-                                isGeneratingPlan: _isGeneratingPlan,
-                                planProgress: _planProgress,
-                                isPlanReady: _planReady,
+                                // trạng thái 2 plan
+                                isGeneratingWorkout: _isGeneratingWorkout,
+                                workoutDone: _workoutDone,
+                                isGeneratingMeal: _isGeneratingMeal,
+                                mealDone: _mealDone,
                               ),
                             ),
                           ],
@@ -742,9 +723,11 @@ class _ChatMessageList extends StatelessWidget {
     this.showPlanCta = false,
     this.onGetPlan,
     this.controller,
-    this.isGeneratingPlan = false,
-    this.planProgress = 0.0,
-    this.isPlanReady = false,
+    // NEW
+    this.isGeneratingWorkout = false,
+    this.workoutDone = false,
+    this.isGeneratingMeal = false,
+    this.mealDone = false,
   });
 
   final List<({String text, bool isMe})> messages;
@@ -752,10 +735,12 @@ class _ChatMessageList extends StatelessWidget {
   final bool isTyping;
   final bool showPlanCta;
 
-  final bool isGeneratingPlan;
+  // NEW: 2 plan
+  final bool isGeneratingWorkout;
+  final bool workoutDone;
 
-  final double planProgress;
-  final bool isPlanReady;
+  final bool isGeneratingMeal;
+  final bool mealDone;
 
   final VoidCallback? onGetPlan;
   final ScrollController? controller;
@@ -789,7 +774,24 @@ class _ChatMessageList extends StatelessWidget {
           );
         }
 
+        // 2) Plan CTA + progress
         if (showPlanCta && index == baseCount) {
+          // chọn text cho dòng mô tả
+          String line;
+          if (isGeneratingWorkout && !workoutDone) {
+            line = 'Đang tạo lịch tập cho bạn...';
+          } else if (workoutDone && isGeneratingMeal && !mealDone) {
+            line = 'Đang tạo thực đơn cho bạn...';
+          } else if (workoutDone && mealDone) {
+            line = 'Plan cá nhân hóa của bạn đã sẵn sàng';
+          } else {
+            line = 'Mình đã sẵn sàng làm plan cá nhân hóa cho bạn';
+          }
+
+          final bool isAnyGenerating =
+              (isGeneratingWorkout && !workoutDone) ||
+              (isGeneratingMeal && !mealDone);
+
           return Padding(
             padding: const EdgeInsets.only(
               top: 6,
@@ -811,37 +813,48 @@ class _ChatMessageList extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          isGeneratingPlan
-                              ? 'Đang tạo plan cho bạn...'
-                              : isPlanReady
-                              ? 'Plan cá nhân hóa của bạn đã sẵn sàng'
-                              : 'Mình đã sẵn sàng làm plan cá nhân hóa cho bạn',
+                          line,
                           style: t.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 4),
 
-                        if (isGeneratingPlan)
-                          SizedBox(
-                            width:
-                                MediaQuery.of(context).size.width *
-                                0.5, // dài hơn
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(999),
-                              child: LinearProgressIndicator(
-                                value: planProgress.clamp(0.0, 1.0),
-                                minHeight: 4,
-                                backgroundColor: cs.primary.withOpacity(0.12),
-                                valueColor: AlwaysStoppedAnimation(cs.primary),
+                        // ===== Chỉ hiện 1 thanh tại 1 thời điểm =====
+                        if (isGeneratingWorkout && !workoutDone)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: MediaQuery.of(context).size.width * 0.45,
+                                child: PlanGenerateProgressBar(
+                                  isDone: workoutDone,
+                                ),
                               ),
-                            ),
+                            ],
+                          )
+                        else if (workoutDone && isGeneratingMeal && !mealDone)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: MediaQuery.of(context).size.width * 0.45,
+                                child: PlanGenerateProgressBar(
+                                  isDone: mealDone,
+                                ),
+                              ),
+                            ],
                           )
                         else
+                          // Khi KHÔNG còn generate gì → show CTA
                           GestureDetector(
                             onTap: onGetPlan,
                             child: Text(
-                              isPlanReady ? 'Xem plan' : 'Nhận plan',
+                              (workoutDone && mealDone)
+                                  ? 'Xem plan'
+                                  : 'Nhận plan',
                               style: t.labelMedium?.copyWith(
                                 color: cs.primary,
                                 fontWeight: FontWeight.w700,

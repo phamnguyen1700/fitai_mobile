@@ -80,20 +80,38 @@ class AiHealthPlanCreateController extends _$AiHealthPlanCreateController {
 
 // ===================== MEAL PLAN PREVIEW ===================== //
 
-@riverpod
+@Riverpod(keepAlive: true)
 Future<MealPlanGenerateResponse> mealPlanGenerate(
   MealPlanGenerateRef ref,
 ) async {
   final repo = ref.read(chatThreadRepositoryProvider);
-  // gọi đúng hàm bạn đã viết trong repository
   return repo.generateMealPlan();
 }
 
-/// Nếu UI chỉ cần list DailyMealPlan cho phần preview
-@riverpod
+@Riverpod(keepAlive: true)
 Future<List<DailyMealPlan>> mealPlanDailyMeals(
   MealPlanDailyMealsRef ref,
 ) async {
+  final resp = await ref.watch(mealPlanGenerateProvider.future);
+  return resp.data.data.dailyMeals;
+}
+
+// ===================== WORKOUT PLAN GENERATE ===================== //
+
+@Riverpod(keepAlive: true)
+Future<WorkoutPlanGenerateResponse> workoutPlanGenerate(
+  WorkoutPlanGenerateRef ref,
+) async {
   final repo = ref.read(chatThreadRepositoryProvider);
-  return repo.generateMealPlanDailyMeals();
+  return repo.generateWorkoutPlan();
+}
+
+/// Chỉ cần danh sách các ngày (dayNumber, sessionName, exercises)
+@Riverpod(keepAlive: true)
+Future<List<WorkoutPlanDay>> workoutPlanDays(WorkoutPlanDaysRef ref) async {
+  // Lấy full plan trước
+  final resp = await ref.watch(workoutPlanGenerateProvider.future);
+
+  // resp.data.data.workoutPlan
+  return resp.data.data.workoutPlan;
 }

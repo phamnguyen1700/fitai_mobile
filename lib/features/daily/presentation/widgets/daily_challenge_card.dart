@@ -10,7 +10,7 @@ class DailyChallengeCard extends StatelessWidget {
     this.totalParticipants,
     this.maxAvatars = 3,
     this.onTap,
-    this.illustration, // ảnh nền
+    this.illustration,
     this.height = 120,
   });
 

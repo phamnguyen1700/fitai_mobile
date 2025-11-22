@@ -50,4 +50,14 @@ class ApiConstants {
   //daily
   static const String dailyMeals = '/mealplan/daily-meals';
   static const String mealPlanGenerate = '/api/mealplan/generate';
+  static const String workoutPlanGenerate = '/api/workoutplan/generate';
+  static const previousCheckpointCompletionPercent =
+      '/checkpoints/previous/completion-percent';
+  static const checkpointsLineChart = '/checkpoints/linechart';
+  static const checkpointsPieChart = '/checkpoints/piechart';
+  static const String workoutPlanSchedule = '/workoutplan/schedule';
+  static const String mealUploadPhoto = '/mealplan/upload-photo';
+  static const String mealMarkCompleted = '/mealplan/mark-completed';
+  static const uploadWorkoutVideo = '/workoutplan/upload-video';
+  static const markExerciseCompleted = '/workoutplan/mark-exercise-completed';
 }

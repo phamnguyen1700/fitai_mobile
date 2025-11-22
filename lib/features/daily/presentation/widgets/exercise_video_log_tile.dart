@@ -1,30 +1,54 @@
+// lib/features/daily/presentation/widgets/exercise_video_log_tile.dart
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'package:fitai_mobile/core/widgets/network_thumb_video.dart';
 
-class ExerciseVideo extends StatefulWidget {
+// Widget tạo thumbnail từ local path / network url
+import 'package:fitai_mobile/core/widgets/network_thumb_video.dart';
+import 'package:fitai_mobile/features/daily/presentation/widgets/user_video.dart';
+
+/// Tile bài tập: phát video hướng dẫn + cho phép chọn video tự quay để log
+class ExerciseVideoLogTile extends StatefulWidget {
   final String title;
-  final String thumbUrl; // hiện tại KHÔNG dùng, nhưng giữ field để khỏi sửa API
+
+  /// Ví dụ: "Cardio", "Strength"
   final String category;
+
+  /// Thời lượng (phút) hoặc sets / reps
   final int? sets;
   final int? reps;
   final int? minutes;
-  final String? videoUrl; // URL video thực tế (mp4 / HLS / ...)
 
-  const ExerciseVideo({
+  /// Ghi chú thêm từ API (exercise.note)
+  final String? note;
+
+  /// Video hướng dẫn (từ API: exercise.videoUrl)
+  final String? demoVideoUrl;
+
+  /// Video log đã có sẵn từ server (exercise.videoLogUrl), nếu có
+  final String? existingLogVideoUrl;
+
+  /// Callback khi user chọn video mới: [localFilePath]
+  final void Function(String localFilePath)? onVideoPicked;
+
+  const ExerciseVideoLogTile({
     super.key,
     required this.title,
-    required this.thumbUrl,
     required this.category,
     this.sets,
     this.reps,
     this.minutes,
-    this.videoUrl,
+    this.note,
+    this.demoVideoUrl,
+    this.existingLogVideoUrl,
+    this.onVideoPicked,
   });
 
-  /// Meta: "5 phút" hoặc "3 sets × 12 reps"
+  /// Meta: "30 phút" hoặc "3 sets × 12 reps"
   String get meta {
     if (minutes != null && minutes! > 0) return '$minutes phút';
     if (sets != null && reps != null) return '$sets sets × $reps reps';
@@ -32,10 +56,10 @@ class ExerciseVideo extends StatefulWidget {
   }
 
   @override
-  State<ExerciseVideo> createState() => _ExerciseVideoState();
+  State<ExerciseVideoLogTile> createState() => _ExerciseVideoLogTileState();
 }
 
-class _ExerciseVideoState extends State<ExerciseVideo> {
+class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
   VideoPlayerController? _controller;
   bool _initialized = false;
   bool _isPlaying = false;
@@ -43,16 +67,29 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
   bool _isLoading = false;
   bool _hasError = false;
 
-  /// Hiện nút replay khi video chạy xong
+  /// Khi video chạy tới cuối -> show nút replay
   bool _showReplay = false;
+
+  /// File video user vừa chọn (local)
+  String? _pickedVideoPath;
 
   /// volume 0–1 cho slider
   double _volume = 0.0;
 
   bool get _inlineSupported {
+    // App này mobile only nên kIsWeb sẽ luôn false
     if (kIsWeb) return false;
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  /// URL/path dùng để làm thumbnail khi chưa play
+  /// 👉 Giờ CHỈ dùng video hướng dẫn (demoVideoUrl), không dùng video user
+  String? get _thumbSource {
+    if (widget.demoVideoUrl?.isNotEmpty ?? false) {
+      return widget.demoVideoUrl;
+    }
+    return null;
   }
 
   @override
@@ -66,7 +103,7 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     if (!mounted || _controller == null || !_initialized) return;
     final v = _controller!.value;
 
-    // Nếu hết video và đã dừng → show replay
+    // Nếu đã tới cuối và dừng -> show replay
     if (!v.isPlaying && v.position >= v.duration && !_showReplay) {
       setState(() {
         _isPlaying = false;
@@ -75,15 +112,12 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     }
   }
 
+  /// 👉 Chỉ play video hướng dẫn (demoVideoUrl)
   Future<void> _initAndPlay() async {
-    if (!_inlineSupported ||
-        widget.videoUrl == null ||
-        widget.videoUrl!.isEmpty) {
-      return;
-    }
+    if (!_inlineSupported) return;
 
-    final uri = Uri.tryParse(widget.videoUrl!);
-    if (uri == null) return;
+    final demo = widget.demoVideoUrl;
+    if (demo == null || demo.isEmpty) return;
 
     setState(() {
       _isLoading = true;
@@ -95,13 +129,17 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     _controller?.dispose();
     _controller = null;
 
-    _controller = VideoPlayerController.networkUrl(uri);
     try {
+      final uri = Uri.tryParse(demo);
+      if (uri == null) throw Exception('Invalid URL');
+      _controller = VideoPlayerController.networkUrl(uri);
+
       await _controller!.initialize();
       _controller!
         ..setLooping(false)
         ..setVolume(_isMuted ? 0 : 1);
       _controller!.addListener(_onVideoTick);
+
       await _controller!.play();
 
       if (!mounted) return;
@@ -121,24 +159,11 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     }
   }
 
-  void _replay() {
-    if (_controller == null || !_initialized) return;
-    _controller!
-      ..seekTo(Duration.zero)
-      ..setVolume(_isMuted ? 0 : 1)
-      ..play();
-
-    setState(() {
-      _isPlaying = true;
-      _showReplay = false;
-    });
-  }
-
   void _togglePlay() {
     if (_controller == null || !_initialized) return;
     final v = _controller!.value;
 
-    // Nếu đã kết thúc → replay
+    // Nếu đã hết -> replay từ đầu
     if (v.position >= v.duration) {
       _replay();
       return;
@@ -157,6 +182,17 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     }
   }
 
+  void _replay() {
+    if (_controller == null || !_initialized) return;
+    _controller!.seekTo(Duration.zero);
+    _controller!.setVolume(_isMuted ? 0 : 1);
+    _controller!.play();
+    setState(() {
+      _isPlaying = true;
+      _showReplay = false;
+    });
+  }
+
   void _onTapVideo() {
     if (_controller == null) {
       _initAndPlay();
@@ -165,9 +201,19 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     }
   }
 
-  void _toggleMute() {
+  void _openFullScreen() {
     if (_controller == null || !_initialized) return;
 
+    Navigator.of(context, rootNavigator: true).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            _FullScreenVideoPage(controller: _controller!, title: widget.title),
+      ),
+    );
+  }
+
+  void _toggleMute() {
+    if (_controller == null || !_initialized) return;
     setState(() {
       _isMuted = !_isMuted;
       _volume = _isMuted ? 0.0 : 1.0;
@@ -184,24 +230,41 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
     _controller!.setVolume(v);
   }
 
-  void _openFullScreen() {
-    if (_controller == null || !_initialized) return;
-
-    Navigator.of(context, rootNavigator: true).push(
-      MaterialPageRoute(
-        builder: (_) =>
-            _FullScreenVideoPage(controller: _controller!, title: widget.title),
-      ),
+  /// Mobile app nên không cần check kIsWeb nữa
+  Future<void> _pickVideo() async {
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickVideo(
+      source: ImageSource.gallery,
+      maxDuration: const Duration(minutes: 5),
     );
+    if (picked == null) return;
+
+    setState(() {
+      _pickedVideoPath = picked.path;
+    });
+
+    widget.onVideoPicked?.call(picked.path);
+
+    // ❌ Không auto play nữa, video chính luôn là demo
+    // await _initAndPlay();
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bodySmall = Theme.of(context).textTheme.bodySmall;
+    final t = Theme.of(context).textTheme;
+    final bodySmall = t.bodySmall;
 
-    final metaText = widget.meta; // "5 phút" hoặc "3 sets × 12 reps"
-    final categoryText = widget.category;
+    final description = widget.meta;
+    final note = widget.note;
+    final hasMeta = description.isNotEmpty;
+    final hasNote = note != null && note.trim().isNotEmpty;
+
+    final hasUserVideo =
+        _pickedVideoPath != null ||
+        (widget.existingLogVideoUrl?.isNotEmpty ?? false);
+
+    final thumbSource = _thumbSource;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -210,6 +273,7 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ====== VIDEO AREA (VIDEO HƯỚNG DẪN) ======
             AspectRatio(
               aspectRatio: _initialized && _controller != null
                   ? _controller!.value.aspectRatio
@@ -219,14 +283,9 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // ─────────────────────────────────────────
-                    // 1. ĐÃ KHỞI TẠO → HIỂN THỊ VIDEO PLAYER
-                    // ─────────────────────────────────────────
+                    // ---- Lớp nền: video hoặc thumbnail ----
                     if (_initialized && _controller != null)
                       VideoPlayer(_controller!)
-                    // ─────────────────────────────────────────
-                    // 2. LỖI VIDEO
-                    // ─────────────────────────────────────────
                     else if (_hasError)
                       Container(
                         color: cs.surfaceVariant,
@@ -237,38 +296,32 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
                           ),
                         ),
                       )
-                    // ─────────────────────────────────────────
-                    // 3. LOADING
-                    // ─────────────────────────────────────────
                     else if (_isLoading)
                       Container(
                         color: cs.surfaceVariant,
                         child: const Center(child: CircularProgressIndicator()),
                       )
-                    // ─────────────────────────────────────────
-                    // 4. THUMBNAIL TỪ VIDEO (local hoặc remote)
-                    // ─────────────────────────────────────────
-                    else if (widget.videoUrl != null &&
-                        widget.videoUrl!.isNotEmpty)
-                      NetworkVideoThumbnail(videoUrl: widget.videoUrl!)
-                    // ─────────────────────────────────────────
-                    // 5. FALLBACK NẾU KHÔNG TẠO THUMB ĐƯỢC
-                    // ─────────────────────────────────────────
+                    else if (thumbSource != null)
+                      NetworkVideoThumbnail(videoUrl: thumbSource)
                     else
-                      Container(
-                        color: cs.surfaceVariant,
-                        child: const Center(
-                          child: Icon(
-                            Icons.play_arrow,
-                            size: 52,
-                            color: Colors.white,
-                          ),
+                      Container(color: cs.surfaceVariant),
+
+                    // Icon play ở giữa khi chưa play (không lỗi, không loading)
+                    if (!_initialized &&
+                        !_isLoading &&
+                        !_hasError &&
+                        !_showReplay)
+                      const Center(
+                        child: Icon(
+                          Icons.play_arrow,
+                          size: 52,
+                          color: Colors.white,
                         ),
                       ),
 
-                    // ─────────────────────────────────────────
-                    // 6. Hiện nút replay khi video chạy xong
-                    // ─────────────────────────────────────────
+                    // ❌ BỎ badge "Video của bạn" khỏi video chính
+
+                    // Nút replay ở giữa khi xem xong
                     if (_showReplay)
                       Center(
                         child: IconButton(
@@ -278,9 +331,7 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
                         ),
                       ),
 
-                    // ─────────────────────────────────────────
-                    // 7. Controls dưới video (volume + fullscreen)
-                    // ─────────────────────────────────────────
+                    // ====== BOTTOM CONTROLS (volume + fullscreen) ======
                     Positioned(
                       left: 0,
                       right: 0,
@@ -344,60 +395,134 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
               ),
             ),
 
-            // ===== TEXT INFO =====
+            // ====== TEXT + BUTTON "Tải video bài tập" ======
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Cột 1: Tên bài tập + sets/reps/minutes
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
+                  // Dòng 1: Tên bài tập (trái) + Category (phải)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
                           widget.title,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        if (metaText.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            metaText, // ví dụ: "3 sets × 12 reps" hoặc "5 phút"
-                            style: bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Cột 2: Category + description (nếu sau này có thêm)
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          categoryText,
-                          textAlign: TextAlign.right,
-                          style: bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
+                          style: t.titleMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        // Nếu sau này bạn có thêm field description riêng thì add ở đây
-                        // Text(
-                        //   widget.description,
-                        //   textAlign: TextAlign.right,
-                        //   style: bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                        // ),
+                      ),
+                      if (widget.category.isNotEmpty)
+                        Text(
+                          widget.category.toLowerCase(), // chữ thường
+                          style: bodySmall?.copyWith(
+                            // giảm 1 size chữ
+                            fontSize: (bodySmall.fontSize ?? 12) - 1,
+                            color: cs.primary, // dùng màu primary
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+
+                  // Dòng 2: meta (sets/reps hoặc phút) + note cùng hàng
+                  if (hasMeta || hasNote)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (hasMeta)
+                          Text(
+                            description,
+                            style: bodySmall?.copyWith(
+                              color: cs.onSurface,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        if (hasMeta && hasNote) const SizedBox(width: 12),
+                        if (hasNote)
+                          Expanded(
+                            child: Text(
+                              note!,
+                              style: bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.right,
+                            ),
+                          ),
                       ],
                     ),
+
+                  const SizedBox(height: 10),
+
+                  // Nút giống "Tải ảnh bữa ăn"
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        minimumSize: Size.zero,
+                      ),
+                      onPressed: _pickVideo,
+                      icon: Icon(
+                        Icons.videocam_outlined,
+                        size: 18,
+                        color: cs.primary,
+                      ),
+                      label: Text(
+                        hasUserVideo
+                            ? 'Đổi video bài tập'
+                            : 'Tải video bài tập',
+                        style: bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
                   ),
+
+                  if (_pickedVideoPath != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Đã chọn video',
+                        style: bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    )
+                  else if (widget.existingLogVideoUrl != null &&
+                      widget.existingLogVideoUrl!.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Đã có video log',
+                        style: bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+
+                  // 🆕 VIDEO CỦA NGƯỜI DÙNG + COMMENT Ở DƯỚI
+                  if (hasUserVideo)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: UserExerciseVideoSection(
+                        title: widget.title,
+                        localVideoPath: _pickedVideoPath,
+                        existingVideoUrl: widget.existingLogVideoUrl,
+                        // Sau này có thể truyền comments & onSubmitComment từ ngoài vào
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -408,7 +533,7 @@ class _ExerciseVideoState extends State<ExerciseVideo> {
   }
 }
 
-/// Full-screen page: lock landscape + immersive giống bên log
+/// Full-screen page cho video, lock landscape + immersive
 class _FullScreenVideoPage extends StatefulWidget {
   final VideoPlayerController controller;
   final String title;

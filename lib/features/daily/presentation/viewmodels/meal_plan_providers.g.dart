@@ -184,11 +184,9 @@ final todayMealsProvider = AutoDisposeFutureProvider<MealDayData>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef TodayMealsRef = AutoDisposeFutureProviderRef<MealDayData>;
-String _$currentDayHash() => r'e433f0a7447ed9c5401ad41c4d0f2614f2cd0c38';
+String _$currentDayHash() => r'6d0c5a6ecb6baa3bab0f6231455b17e1426ef22b';
 
-/// Ngày hiện tại (1–7)
-///
-/// Copied from [CurrentDay].
+/// See also [CurrentDay].
 @ProviderFor(CurrentDay)
 final currentDayProvider =
     AutoDisposeNotifierProvider<CurrentDay, int>.internal(

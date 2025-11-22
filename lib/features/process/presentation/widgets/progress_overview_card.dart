@@ -1,8 +1,10 @@
 // lib/features/profile/presentation/widgets/progress_overview_card.dart
 import 'package:flutter/material.dart';
-import 'body_composition_donut.dart';
 
-class ProgressOverviewCard extends StatelessWidget {
+import '../../../../core/widgets/body_composition_donut.dart';
+import '../../../../core/widgets/inbody_history_chart.dart'; // <-- line chart
+
+class ProgressOverviewCard extends StatefulWidget {
   const ProgressOverviewCard({
     super.key,
     required this.lastUpdated,
@@ -10,6 +12,7 @@ class ProgressOverviewCard extends StatelessWidget {
     required this.fatPercent,
     required this.musclePercent,
     required this.bonePercent,
+    required this.inbodyHistory,
   });
 
   final DateTime lastUpdated;
@@ -17,6 +20,17 @@ class ProgressOverviewCard extends StatelessWidget {
   final double fatPercent;
   final double musclePercent;
   final double bonePercent;
+
+  /// Dùng cho tab "Lịch sử tập luyện"
+  final List<InbodyRecord> inbodyHistory;
+
+  @override
+  State<ProgressOverviewCard> createState() => _ProgressOverviewCardState();
+}
+
+class _ProgressOverviewCardState extends State<ProgressOverviewCard> {
+  /// 0 = Thành phần cơ thể, 1 = Lịch sử tập luyện
+  int _selectedTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +48,7 @@ class ProgressOverviewCard extends StatelessWidget {
             Text('Tiến độ', style: tt.titleMedium),
             const SizedBox(height: 2),
             Text(
-              'Cập nhật lần cuối: ${_fmt(lastUpdated)}',
+              'Cập nhật lần cuối: ${_fmt(widget.lastUpdated)}',
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 12),
@@ -45,7 +59,7 @@ class ProgressOverviewCard extends StatelessWidget {
                 Expanded(
                   child: _kv(
                     'Cân nặng hiện tại',
-                    '${currentWeightKg.toStringAsFixed(1)}kg',
+                    '${widget.currentWeightKg.toStringAsFixed(1)}kg',
                     cs.primary,
                   ),
                 ),
@@ -53,7 +67,7 @@ class ProgressOverviewCard extends StatelessWidget {
                 Expanded(
                   child: _kv(
                     '% Mỡ cơ thể',
-                    '${fatPercent.toStringAsFixed(1)}%',
+                    '${widget.fatPercent.toStringAsFixed(1)}%',
                     cs.error,
                   ),
                 ),
@@ -61,7 +75,7 @@ class ProgressOverviewCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Tab bar mô phỏng Figma (tuỳ chọn). Ở đây giữ đơn giản: “Cơ thể”
+            // Tabs
             Container(
               decoration: BoxDecoration(
                 color: cs.surfaceVariant.withOpacity(.35),
@@ -70,28 +84,44 @@ class ProgressOverviewCard extends StatelessWidget {
               padding: const EdgeInsets.all(6),
               child: Row(
                 children: [
-                  _pill(context, label: 'Thành phần cơ thể', selected: true),
+                  _pill(
+                    context,
+                    label: 'Thành phần cơ thể',
+                    selected: _selectedTab == 0,
+                    onTap: () => setState(() => _selectedTab = 0),
+                  ),
                   const SizedBox(width: 8),
                   _pill(
                     context,
                     label: 'Lịch sử tập luyện',
-                    selected: false,
-                    disabled: true,
+                    selected: _selectedTab == 1,
+                    onTap: () => setState(() => _selectedTab = 1),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
 
-            // Donut chart 3 thông số
-            Center(
-              child: BodyCompositionDonut(
-                fatPercent: fatPercent,
-                musclePercent: musclePercent,
-                bonePercent: bonePercent,
-                size: 200,
-                centerHole: 52,
-              ),
+            // Nội dung theo tab
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: _selectedTab == 0
+                  ? Center(
+                      key: const ValueKey('body-comp'),
+                      child: BodyCompositionDonut(
+                        fatPercent: widget.fatPercent,
+                        musclePercent: widget.musclePercent,
+                        bonePercent: widget.bonePercent,
+                        size: 200,
+                        centerHole: 52,
+                      ),
+                    )
+                  : SizedBox(
+                      key: const ValueKey('history'),
+                      child: InbodyHistoryChart(data: widget.inbodyHistory),
+                    ),
             ),
           ],
         ),
@@ -120,22 +150,29 @@ class ProgressOverviewCard extends StatelessWidget {
     BuildContext context, {
     required String label,
     required bool selected,
-    bool disabled = false,
+    required VoidCallback onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
     final bg = selected ? cs.primary.withOpacity(.12) : Colors.transparent;
-    final fg = selected
-        ? cs.primary
-        : cs.onSurfaceVariant.withOpacity(disabled ? .5 : 1);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12, color: fg, fontWeight: FontWeight.w600),
+    final fg = selected ? cs.primary : cs.onSurfaceVariant;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

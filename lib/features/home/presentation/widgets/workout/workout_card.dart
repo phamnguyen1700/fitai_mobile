@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 class WorkoutDayCard extends StatelessWidget {
   final String dayTitle; // "Push" / "Day 1 - Upper Body"
   final String featuredTitle; // ví dụ: "Cardio" / "Bench press"
-  final String featuredMeta; // "30 phút" hoặc "3 sets × 12 reps"
   final int totalExercises; // số bài trong ngày
   final VoidCallback? onTap;
   final bool isSelected;
@@ -15,7 +14,6 @@ class WorkoutDayCard extends StatelessWidget {
     super.key,
     required this.dayTitle,
     required this.featuredTitle,
-    required this.featuredMeta,
     required this.totalExercises,
     this.onTap,
     this.isSelected = false,
@@ -27,9 +25,6 @@ class WorkoutDayCard extends StatelessWidget {
     final titleStyle = Theme.of(
       context,
     ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
-    final metaStyle = Theme.of(
-      context,
-    ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
 
     final borderColor = isSelected
         ? cs.primary
@@ -61,7 +56,6 @@ class WorkoutDayCard extends StatelessWidget {
                   children: [
                     Text(featuredTitle, style: titleStyle),
                     const SizedBox(height: 4),
-                    Text(featuredMeta, style: metaStyle),
                   ],
                 ),
               ),
@@ -112,7 +106,7 @@ class _DayPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: cs.primary,
         borderRadius: BorderRadius.circular(14),
@@ -137,12 +131,6 @@ class _DotLine extends StatelessWidget {
         width: 6,
         height: 6,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      ),
-      Container(
-        width: 18,
-        height: 2,
-        margin: const EdgeInsets.only(left: 6),
-        color: color,
       ),
     ],
   );

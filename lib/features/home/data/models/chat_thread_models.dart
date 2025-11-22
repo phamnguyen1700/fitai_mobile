@@ -463,3 +463,124 @@ class MealFood {
 
   Map<String, dynamic> toJson() => _$MealFoodToJson(this);
 }
+
+/// =======================
+/// POST /api/workoutplan/generate
+/// =======================
+/// Response:
+/// {
+///   "data": {
+///     "success": true,
+///     "errorMessage": "",
+///     "processingTime": "00:00:23.0805089",
+///     "goal": "Weight_Loss",
+///     "activityLevel": 1,
+///     "data": {
+///       "workoutPlan": [ { ...WorkoutPlanDay... } ]
+///     }
+///   },
+///   "success": true,
+///   "message": "Workout plan generated successfully"
+/// }
+@JsonSerializable(explicitToJson: true)
+class WorkoutPlanGenerateResponse {
+  final WorkoutPlanGenerateData data;
+  final bool success;
+  final String message;
+
+  WorkoutPlanGenerateResponse({
+    required this.data,
+    required this.success,
+    required this.message,
+  });
+
+  factory WorkoutPlanGenerateResponse.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanGenerateResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanGenerateResponseToJson(this);
+}
+
+@JsonSerializable(explicitToJson: true)
+class WorkoutPlanGenerateData {
+  final bool success;
+  final String errorMessage;
+  final String processingTime;
+  final String goal;
+  final int activityLevel;
+  final WorkoutPlanCoreData data;
+
+  WorkoutPlanGenerateData({
+    required this.success,
+    required this.errorMessage,
+    required this.processingTime,
+    required this.goal,
+    required this.activityLevel,
+    required this.data,
+  });
+
+  factory WorkoutPlanGenerateData.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanGenerateDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanGenerateDataToJson(this);
+}
+
+/// Lớp chứa mảng workoutPlan
+@JsonSerializable(explicitToJson: true)
+class WorkoutPlanCoreData {
+  final List<WorkoutPlanDay> workoutPlan;
+
+  WorkoutPlanCoreData({required this.workoutPlan});
+
+  factory WorkoutPlanCoreData.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanCoreDataFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanCoreDataToJson(this);
+}
+
+/// 1 ngày trong workout plan
+@JsonSerializable(explicitToJson: true)
+class WorkoutPlanDay {
+  final int dayNumber;
+  final String sessionName;
+  final List<WorkoutExercise> exercises;
+
+  WorkoutPlanDay({
+    required this.dayNumber,
+    required this.sessionName,
+    required this.exercises,
+  });
+
+  factory WorkoutPlanDay.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanDayFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanDayToJson(this);
+}
+
+/// 1 bài tập trong ngày
+@JsonSerializable()
+class WorkoutExercise {
+  final String exerciseId;
+  final String name;
+  final int? sets;
+  final int? reps;
+  final int? durationMinutes;
+  final String category;
+  final String videoUrl;
+  final String note;
+
+  WorkoutExercise({
+    required this.exerciseId,
+    required this.name,
+    this.sets,
+    this.reps,
+    this.durationMinutes,
+    required this.category,
+    required this.videoUrl,
+    required this.note,
+  });
+
+  factory WorkoutExercise.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutExerciseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutExerciseToJson(this);
+}

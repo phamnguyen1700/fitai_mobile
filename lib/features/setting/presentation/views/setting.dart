@@ -133,8 +133,10 @@ class _ProfileTab extends ConsumerWidget {
                 displayName: displayName,
                 subtitle: user.email,
                 stats: stats,
-                onEdit: () {
-                  // TODO: navigate sang màn chỉnh sửa profile
+                goal: user.goal,
+                readOnlyFields: const {'Chiều cao', 'Cân nặng'},
+                onEdit: (updatedStats, updatedGoal) {
+                  // TODO update API
                 },
               ),
             ),
@@ -143,7 +145,7 @@ class _ProfileTab extends ConsumerWidget {
               title: 'Mật khẩu và bảo mật',
               child: SecurityCard(
                 email: user.email,
-                maskedPassword: '**********', // không có password, để mask
+                maskedPassword: '**********',
               ),
             ),
           ],
@@ -152,60 +154,47 @@ class _ProfileTab extends ConsumerWidget {
     );
   }
 
-  String _buildDisplayName(UserModel user) {
-    if (user.fullName != null && user.fullName!.trim().isNotEmpty) {
-      return user.fullName!;
-    }
-    final name = '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim();
-    return name.isEmpty ? 'Người dùng' : name;
+  // _buildDisplayName & _buildStats giữ nguyên như bạn đang dùng
+}
+
+String _buildDisplayName(UserModel user) {
+  if (user.fullName != null && user.fullName!.trim().isNotEmpty) {
+    return user.fullName!;
+  }
+  final name = '${user.firstName ?? ''} ${user.lastName ?? ''}'.trim();
+  return name.isEmpty ? 'Người dùng' : name;
+}
+
+Map<String, String> _buildStats(UserModel user) {
+  final dateFormat = DateFormat('dd/MM/yyyy');
+
+  String genderLabel;
+  switch (user.gender) {
+    case Gender.M:
+      genderLabel = 'Nam';
+      break;
+    case Gender.F:
+      genderLabel = 'Nữ';
+      break;
+    default:
+      genderLabel = '-';
   }
 
-  Map<String, String> _buildStats(UserModel user) {
-    final dateFormat = DateFormat('dd/MM/yyyy');
+  return {
+    'Họ': user.firstName ?? '',
+    'Tên': user.lastName ?? '',
+    'Ngày sinh': user.dateOfBirth != null
+        ? dateFormat.format(user.dateOfBirth!.toLocal())
+        : '-',
+    'Giới tính': genderLabel,
+    'Chiều cao (khóa)': user.height != null
+        ? '${user.height!.toStringAsFixed(0)} cm'
+        : '-',
 
-    String genderLabel;
-    switch (user.gender) {
-      case Gender.M:
-        genderLabel = 'Nam';
-        break;
-      case Gender.F:
-        genderLabel = 'Nữ';
-        break;
-      default:
-        genderLabel = '-';
-    }
-
-    String goalLabel;
-    switch (user.goal) {
-      case Goal.Weight_Loss:
-        goalLabel = 'Giảm cân';
-        break;
-      case Goal.Weight_Gain:
-        goalLabel = 'Tăng cân';
-        break;
-      case Goal.Build_Muscle:
-        goalLabel = 'Tăng cơ';
-        break;
-      case Goal.Maintain_Weight:
-      default:
-        goalLabel = 'Duy trì cân nặng';
-    }
-
-    return {
-      'Họ tên đầy đủ': _buildDisplayName(user),
-      'Ngày sinh': user.dateOfBirth != null
-          ? dateFormat.format(user.dateOfBirth!.toLocal())
-          : '-',
-      'Chiều cao': user.height != null
-          ? '${user.height!.toStringAsFixed(0)} cm'
-          : '-',
-      'Cân nặng': user.weight != null
-          ? '${user.weight!.toStringAsFixed(1)} kg'
-          : '-',
-      'Giới tính': genderLabel,
-      'Mục tiêu': goalLabel,
-    };
-  }
+    'Cân nặng (khóa)': user.weight != null
+        ? '${user.weight!.toStringAsFixed(1)} kg'
+        : '-',
+  };
 }
 
 class _NotificationsTab extends StatelessWidget {
