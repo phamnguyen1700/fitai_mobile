@@ -5,6 +5,7 @@ import 'package:fitai_mobile/features/camera/pose_painter_mirror.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import './feet_guide.dart';
 
 class BodyCameraScreen extends StatefulWidget {
@@ -21,6 +22,12 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
   late Future<void> _initFuture;
   List<CameraDescription> _cameras = [];
   int _cameraIndex = 0;
+
+  late final FlutterTts _tts;
+  bool _ttsUseEnglish = false; // ưu tiên nói tiếng Anh nếu có
+
+  final Map<String, DateTime> _lastSpokenAt = {};
+  static const Duration _speakCooldown = Duration(seconds: 4);
 
   String? _error;
 
@@ -60,6 +67,56 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
   void initState() {
     super.initState();
 
+    _tts = FlutterTts();
+
+    // Khởi tạo TTS: ưu tiên EN, nếu không có thì dùng VI
+    Future.microtask(() async {
+      await _tts.awaitSpeakCompletion(true);
+
+      try {
+        // (optional) log language list
+        final langs = await _tts.getLanguages;
+        debugPrint('[TTS] available languages: $langs');
+
+        bool enSupported = false;
+        bool viSupported = false;
+
+        try {
+          final en = await _tts.isLanguageAvailable("en-US");
+          enSupported = en == true;
+        } catch (e) {
+          debugPrint('[TTS] isLanguageAvailable("en-US") error: $e');
+        }
+
+        try {
+          final vi = await _tts.isLanguageAvailable("vi-VN");
+          viSupported = vi == true;
+        } catch (e) {
+          debugPrint('[TTS] isLanguageAvailable("vi-VN") error: $e');
+        }
+
+        if (enSupported) {
+          debugPrint('[TTS] Using ENGLISH voice (en-US)');
+          await _tts.setLanguage("en-US");
+          _ttsUseEnglish = true;
+        } else if (viSupported) {
+          debugPrint('[TTS] EN not supported, using VIETNAMESE voice (vi-VN)');
+          await _tts.setLanguage("vi-VN");
+          _ttsUseEnglish = false;
+        } else {
+          // fallback cuối cùng: thử EN
+          debugPrint('[TTS] Neither EN nor VI reported supported, fallback EN');
+          await _tts.setLanguage("en-US");
+          _ttsUseEnglish = true;
+        }
+
+        await _tts.setSpeechRate(0.5);
+        await _tts.setPitch(1.0);
+      } catch (e) {
+        debugPrint('[TTS] init error: $e');
+      }
+    });
+
     _poseDetector = PoseDetector(
       options: PoseDetectorOptions(mode: PoseDetectionMode.stream),
     );
@@ -84,8 +141,7 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
         ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid
-            ? ImageFormatGroup
-                  .nv21 // để dùng InputImage.fromBytes
+            ? ImageFormatGroup.nv21
             : ImageFormatGroup.bgra8888,
       );
 
@@ -105,6 +161,7 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
     _controller?.stopImageStream();
     _controller?.dispose();
     _poseDetector.close();
+    _tts.stop();
     super.dispose();
   }
 
@@ -174,12 +231,25 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
   }
 
   void _setFeetHint() {
-    final msg = _stage == _CaptureStage.front
+    final bool isFront = _stage == _CaptureStage.front;
+
+    final msg = isFront
         ? 'Đặt chân bạn vào đúng ô\nở phía dưới màn hình.'
         : 'Quay người sang trái và\nđặt chân bạn vào ô phía dưới.';
     if (_hintText != msg) {
       setState(() => _hintText = msg);
     }
+
+    // Voice
+    _speakHint(
+      isFront ? 'feet_front' : 'feet_side',
+      vi: isFront
+          ? 'Đặt hai bàn chân vào đúng ô trắng ở phía dưới màn hình.'
+          : 'Quay người sang trái và đặt hai bàn chân vào ô trắng ở phía dưới màn hình.',
+      en: isFront
+          ? 'Place both of your feet inside the white boxes at the bottom of the screen.'
+          : 'Turn your body to the left and place both of your feet inside the white boxes at the bottom of the screen.',
+    );
   }
 
   void _setShoulderHint() {
@@ -190,22 +260,71 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
     if (_hintText != msg) {
       setState(() => _hintText = msg);
     }
+
+    // Voice
+    _speakHint(
+      'shoulder_side',
+      vi: 'Giữ chân trong ô trắng, quay người nghiêng sang trái hơn để hai vai gần chồng lên nhau.',
+      en: 'Keep your feet inside the white boxes and rotate your body to the left so that your shoulders overlap more in the side view.',
+    );
+  }
+
+  Future<void> _speakHint(
+    String key, {
+    required String vi,
+    String? en,
+    bool force = false,
+  }) async {
+    final now = DateTime.now();
+
+    if (!force) {
+      final last = _lastSpokenAt[key];
+      if (last != null && now.difference(last) < _speakCooldown) {
+        return;
+      }
+    }
+
+    _lastSpokenAt[key] = now;
+
+    final textToSpeak = _ttsUseEnglish ? (en ?? vi) : vi;
+
+    try {
+      debugPrint('[TTS] speak key=$key, text="$textToSpeak"');
+
+      await _tts.stop();
+      await _tts.speak(textToSpeak);
+    } catch (e) {
+      debugPrint('[TTS] error: $e');
+    }
   }
 
   void _startCountdown() {
     _countdownTimer?.cancel();
     _isCountingDown = true;
 
+    final isFront = _stage == _CaptureStage.front;
+
     setState(() {
-      _hintText = _stage == _CaptureStage.front
+      _hintText = isFront
           ? 'Giữ nguyên, đang chụp ảnh chính diện...'
           : 'Giữ nguyên, đang chụp ảnh bên hông...';
     });
 
+    // Voice – force để chắc chắn đọc lại mỗi khi vào countdown
+    _speakHint(
+      isFront ? 'countdown_front' : 'countdown_side',
+      vi: isFront
+          ? 'Giữ nguyên tư thế, FitAI sẽ chụp ảnh chính diện sau vài giây.'
+          : 'Giữ nguyên tư thế, FitAI sẽ chụp ảnh bên hông sau vài giây.',
+      en: isFront
+          ? 'Hold still. FitAI will capture your front photo in a few seconds.'
+          : 'Hold still. FitAI will capture your side photo in a few seconds.',
+      force: true,
+    );
+
     _countdownTimer = Timer(const Duration(seconds: 5), () {
       if (!mounted) return;
 
-      // 5s sau mà vẫn đủ điều kiện chụp, vẫn đang countdown, và chưa chụp → chụp
       if (_readyForCapture && _isCountingDown && !_isCapturingPhoto) {
         _capturePhotoForCurrentStage();
       } else {
@@ -237,6 +356,7 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
     });
 
     try {
+      // Tạm thời dừng xử lý pose + dừng stream để chụp ảnh
       _canProcess = false;
       await _controller?.stopImageStream();
 
@@ -246,6 +366,7 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
       if (!mounted) return;
 
       if (_stage == _CaptureStage.front) {
+        // 🔹 LƯU ẢNH FRONT + CHUYỂN SANG SIDE
         _frontFile = file;
         _stage = _CaptureStage.side;
 
@@ -254,19 +375,35 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
               'Đã chụp ảnh chính diện.\nQuay người sang trái để chụp bên hông.';
         });
 
-        // Restart stream để chụp ảnh bên hông
-        if (_controller != null && !_controller!.value.isStreamingImages) {
+        await _speakHint(
+          'captured_front',
+          vi: 'Đã chụp xong ảnh chính diện. Bây giờ hãy quay người sang trái để chụp ảnh bên hông.',
+          en: 'Front photo captured. Now turn your body to the left to take a side photo.',
+          force: true,
+        );
+
+        // 🔥 QUAN TRỌNG: BẬT LẠI XỬ LÝ POSE + STREAM CHO BƯỚC SIDE
+        if (_controller != null &&
+            !_controller!.value.isStreamingImages &&
+            mounted) {
           _canProcess = true;
           await _controller!.startImageStream(_processCameraImage);
         }
       } else {
+        // 🔹 ẢNH SIDE - HOÀN THÀNH QUY TRÌNH
         _sideFile = file;
 
         setState(() {
           _hintText = 'Đã chụp xong 2 ảnh.';
         });
 
-        // Trả path ảnh về cho màn trước
+        await _speakHint(
+          'captured_side',
+          vi: 'Đã chụp xong hai ảnh. Bạn có thể tiếp tục.',
+          en: 'Both photos are captured. You can continue.',
+          force: true,
+        );
+
         Navigator.of(
           context,
         ).pop({'frontPath': _frontFile!.path, 'sidePath': _sideFile!.path});
@@ -279,7 +416,7 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
         const SnackBar(content: Text('Không chụp được ảnh, thử lại nhé')),
       );
 
-      // Thử restart stream để user làm lại
+      // Nếu lỗi, cố gắng bật lại stream cho user làm lại
       if (_controller != null && !_controller!.value.isStreamingImages) {
         _canProcess = true;
         await _controller!.startImageStream(_processCameraImage);
@@ -390,12 +527,12 @@ class _BodyCameraScreenState extends State<BodyCameraScreen> {
     final h = _lastImageSize?.height ?? img.height.toDouble();
 
     // ----- VÙNG DỌC (chỉ 10–12% cuối cùng của ảnh) -----
-    const feetBandFraction = 0.12; // 12% chiều cao cuối
+    const feetBandFraction = 0.24; // 12% chiều cao cuối
     final bandTop = h * (1 - feetBandFraction);
     final bandBottom = h * 0.99; // chừa chút margin trên đáy
 
     // ----- VÙNG NGANG (ô ở giữa, chiếm ~25% chiều rộng) -----
-    const centerWidthFraction = 0.25;
+    const centerWidthFraction = 0.5;
     final centerX = w / 2;
     final halfGuideWidth = w * centerWidthFraction / 2;
     final guideLeft = centerX - halfGuideWidth;
