@@ -1,38 +1,76 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
 
-class WeeklyCheckInCard extends StatefulWidget {
-  final String title; // ví dụ: 'Weekly Check-in (Tuần 3/12)'
-  final double progress; // 0.0 – 1.0, ví dụ: 0.30
-  final VoidCallback? onPickWeek; // mở date/week picker sau này
-  final String? lastWeekImageUrl; // ảnh tuần trước (nếu có)
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fitai_mobile/features/camera/camera_level_guide_screen.dart';
+import '../../data/models/checkpoint_note_models.dart';
+import '../viewmodels/checkpoint_note_providers.dart';
+
+class WeeklyCheckInCard extends ConsumerStatefulWidget {
+  final String title; // fallback nếu không có checkpointNumber
+  final double progress; // 0.0 – 1.0
+  final VoidCallback? onPickWeek;
+  final String? lastWeekImageUrl;
+
+  /// Chiều cao hiện tại lấy từ profile (cm)
+  final double? initialHeight;
+
+  /// Số lần / số checkpoint
+  final int? checkpointNumber;
+
+  /// Message trạng thái từ API
+  final String? statusMessage;
 
   const WeeklyCheckInCard({
     super.key,
-    this.title = 'Weekly Check-in (Tuần 3/12)',
-    this.progress = 0.30,
+    this.title = 'Check-in định kì lần:',
+    this.progress = 0.0,
     this.onPickWeek,
     this.lastWeekImageUrl,
+    this.checkpointNumber,
+    this.statusMessage,
+    this.initialHeight,
   });
 
   @override
-  State<WeeklyCheckInCard> createState() => _WeeklyCheckInCardState();
+  ConsumerState<WeeklyCheckInCard> createState() => _WeeklyCheckInCardState();
 }
 
-class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
-  // controllers
+class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
   final _weightCtrl = TextEditingController();
-  final _waistCtrl = TextEditingController();
-  final _hipCtrl = TextEditingController();
+  final _heightCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
 
   bool _remindWeekly = false;
   bool _sendEmail = false;
 
+  // 🆕 path ảnh thực tế sau khi quét body
+  String? _frontImagePath;
+  String? _sideImagePath;
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.initialHeight != null) {
+      _heightCtrl.text = widget.initialHeight!.toStringAsFixed(0);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WeeklyCheckInCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.initialHeight != null &&
+        widget.initialHeight != oldWidget.initialHeight) {
+      _heightCtrl.text = widget.initialHeight!.toStringAsFixed(0);
+    }
+  }
+
   @override
   void dispose() {
     _weightCtrl.dispose();
-    _waistCtrl.dispose();
-    _hipCtrl.dispose();
+    _heightCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
   }
@@ -51,26 +89,135 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
 
   InputDecoration _numInputDeco(
     BuildContext context, {
-    required String hint,
+    required String label,
     String? suffixText,
   }) {
     final cs = Theme.of(context).colorScheme;
+
     return InputDecoration(
-      hintText: hint,
+      labelText: label,
+      floatingLabelBehavior: FloatingLabelBehavior.auto,
       suffixText: suffixText,
       filled: true,
       fillColor: cs.surface,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
     );
+  }
+
+  Widget _buildWeightField(context) {
+    return TextField(
+      controller: _weightCtrl,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: _numInputDeco(
+        context,
+        label: 'Cân nặng hiện tại',
+        suffixText: 'kg',
+      ),
+    );
+  }
+
+  Widget _buildHeightField(context) {
+    return TextField(
+      controller: _heightCtrl,
+      readOnly: true,
+      decoration: _numInputDeco(
+        context,
+        label: 'Chiều cao hiện tại',
+        suffixText: 'cm',
+      ),
+    );
+  }
+
+  Future<void> _openBodyCamera() async {
+    final result = await Navigator.of(context, rootNavigator: true)
+        .push<Map<String, dynamic>?>(
+          MaterialPageRoute(
+            builder: (_) => const CameraLevelGuideScreen(),
+            fullscreenDialog: true,
+          ),
+        );
+
+    if (result == null) return;
+
+    final front = result['frontPath'] as String?;
+    final side = result['sidePath'] as String?;
+
+    if (!mounted) return;
+
+    setState(() {
+      _frontImagePath = front;
+      _sideImagePath = side;
+    });
+  }
+
+  /// 🆕 Gọi API lưu note + lời nhắc
+  Future<void> _submitNote() async {
+    final note = _noteCtrl.text.trim();
+
+    // tuỳ bạn: có thể bắt buộc note không rỗng hoặc 1 trong 2 checkbox phải bật
+    if (note.isEmpty && !_remindWeekly && !_sendEmail) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hãy nhập ghi chú hoặc bật ít nhất một lời nhắc.'),
+        ),
+      );
+      return;
+    }
+
+    final req = CheckpointNoteRequest(
+      remindWeekly: _remindWeekly,
+      sendReportEmail: _sendEmail,
+      note: note,
+    );
+
+    final controller = ref.read(checkpointNoteControllerProvider.notifier);
+
+    final success = await controller.submitNote(req);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Đã lưu Weekly Check-in')));
+      // tuỳ bạn: có muốn clear note không?
+      // _noteCtrl.clear();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lưu thất bại, vui lòng thử lại.')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+
     final p = widget.progress.clamp(0.0, 1.0);
     final percent = (p * 100).round();
+
+    // Nếu có checkpointNumber thì ghép vào sau title – VD: "Check-in định kì lần: 1"
+    final titleText = widget.checkpointNumber != null
+        ? '${widget.title} ${widget.checkpointNumber}'
+        : widget.title;
+
+    // Text trạng thái: ưu tiên message từ API, fallback về "% hoàn thành"
+    final statusText = widget.statusMessage ?? '$percent% Hoàn thành kế hoạch';
+
+    // responsive: màn hẹp → 2 hàng, màn rộng → 1 hàng
+    final shortestSide = MediaQuery.of(context).size.shortestSide;
+    final bool isNarrow = shortestSide < 360;
+
+    // 🆕 trạng thái ảnh
+    final hasFront = _frontImagePath != null && _frontImagePath!.isNotEmpty;
+    final hasSide = _sideImagePath != null && _sideImagePath!.isNotEmpty;
+    final hasAny = hasFront || hasSide;
+
+    // 🆕 trạng thái saving từ controller
+    final noteState = ref.watch(checkpointNoteControllerProvider);
+    final isSaving = noteState.isLoading;
 
     return Card(
       elevation: 0,
@@ -87,7 +234,7 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
               children: [
                 Expanded(
                   child: Text(
-                    widget.title,
+                    titleText,
                     style: tt.titleMedium?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -101,7 +248,7 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
               ],
             ),
 
-            // Progress bar + % text
+            // Progress bar + status text
             Container(
               height: 8,
               decoration: BoxDecoration(
@@ -116,82 +263,227 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '$percent% Hoàn thành kế hoạch',
-              style: tt.bodySmall?.copyWith(color: cs.primary),
-            ),
+            Text(statusText, style: tt.bodySmall?.copyWith(color: cs.primary)),
 
-            // ========= Inputs =========
+            // ========= Nhập thông số =========
             _sectionTitle(context, 'Nhập thông số'),
-            TextField(
-              controller: _weightCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
+            if (isNarrow) ...[
+              _buildWeightField(context),
+              const SizedBox(height: 10),
+              _buildHeightField(context),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(child: _buildWeightField(context)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildHeightField(context)),
+                ],
               ),
-              decoration: _numInputDeco(
-                context,
-                hint: 'Nhập cân nặng hiện tại (kg)',
-                suffixText: 'kg',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _waistCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _numInputDeco(
-                context,
-                hint: 'Nhập vòng eo (cm)',
-                suffixText: 'cm',
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _hipCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: _numInputDeco(
-                context,
-                hint: 'Nhập vòng mông (cm)',
-                suffixText: 'cm',
-              ),
-            ),
+            ],
             const SizedBox(height: 8),
             Text(
-              'AI sẽ phân tích thay đổi % mỡ để điều chỉnh thực đơn.',
+              'AI sẽ phân tích BMI và % mỡ dự kiến từ cân nặng & chiều cao để điều chỉnh thực đơn.',
               style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
 
-            // ========= Upload ảnh =========
-            _sectionTitle(context, 'Upload ảnh'),
-            Row(
-              children: [
-                // Ảnh tuần trước
-                _ImageTile(
-                  label: 'Ảnh tuần trước',
-                  imageUrl:
-                      widget.lastWeekImageUrl ??
-                      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?q=80&w=800&auto=format&fit=crop',
+            // ========= Quét dữ liệu cơ thể =========
+            _sectionTitle(context, 'Quét dữ liệu cơ thể'),
+
+            if (!hasAny) ...[
+              // ----- CHƯA CÓ ẢNH → ảnh mẫu + hướng dẫn -----
+              SizedBox(
+                height: 180,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'lib/core/assets/images/front.png',
+                              height: 150,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Chính diện',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              'lib/core/assets/images/right.png',
+                              height: 150,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Bên hông',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                // Upload tuần này
-                const _UploadTile(label: 'Thêm ảnh tuần này'),
-              ],
+              ),
+              const SizedBox(height: 4),
+              const Center(
+                child: Text(
+                  'Tư thế chính xác',
+                  style: TextStyle(fontWeight: FontWeight.w400, fontSize: 10),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ] else ...[
+              // ----- ĐÃ CÓ ẢNH → hiển thị ảnh thật -----
+              SizedBox(
+                height: 180,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: hasFront
+                                ? Image.file(
+                                    File(_frontImagePath!),
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    height: 150,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: cs.surfaceContainerHighest,
+                                    ),
+                                    child: const Icon(
+                                      Icons.person_outline,
+                                      size: 40,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Chính diện (đã quét)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: hasSide
+                                ? Image.file(
+                                    File(_sideImagePath!),
+                                    height: 150,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    height: 150,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: cs.surfaceContainerHighest,
+                                    ),
+                                    child: const Icon(
+                                      Icons.person_outline,
+                                      size: 40,
+                                    ),
+                                  ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Bên hông (đã quét)',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+
+            // Hộp hướng dẫn (giữ chung cho cả 2 trạng thái)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Hướng dẫn chụp:',
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '• Đứng thẳng, toàn thân nằm trong khung hình.\n'
+                    '• Ánh sáng đủ, nền phía sau đơn giản.\n'
+                    '• Mặc đồ ôm vừa, không quá rộng.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openBodyCamera,
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: Text(
+                  hasAny ? 'Quét lại dữ liệu cơ thể' : 'Quét dữ liệu cơ thể',
+                ),
+              ),
             ),
 
             // ========= Lời nhắc =========
             _sectionTitle(context, 'Lời nhắc'),
             Padding(
-              padding: const EdgeInsets.only(top: 0), // bỏ khoảng trống thừa
+              padding: const EdgeInsets.only(top: 0),
               child: Column(
                 children: [
                   Theme(
-                    data: Theme.of(context).copyWith(
-                      visualDensity:
-                          VisualDensity.compact, // ✅ thu nhỏ chiều cao
-                    ),
+                    data: Theme.of(
+                      context,
+                    ).copyWith(visualDensity: VisualDensity.compact),
                     child: CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -203,9 +495,9 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
                     ),
                   ),
                   Theme(
-                    data: Theme.of(context).copyWith(
-                      visualDensity: VisualDensity.compact, // ✅ đồng bộ spacing
-                    ),
+                    data: Theme.of(
+                      context,
+                    ).copyWith(visualDensity: VisualDensity.compact),
                     child: CheckboxListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
@@ -245,93 +537,22 @@ class _WeeklyCheckInCardState extends State<WeeklyCheckInCard> {
               ),
             ),
 
-            // ===== Submit row =====
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
-                onPressed: () {
-                  // TODO: gọi notifier để submit
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã lưu Weekly Check-in')),
-                  );
-                },
-                child: const Text('Lưu cập nhật'),
+                onPressed: isSaving ? null : _submitNote,
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Lưu cập nhật'),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Tile hiển thị ảnh (tuần trước)
-class _ImageTile extends StatelessWidget {
-  final String label;
-  final String imageUrl;
-  const _ImageTile({required this.label, required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Image.network(
-            imageUrl,
-            width: 92,
-            height: 92,
-            fit: BoxFit.cover,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
-    );
-  }
-}
-
-/// Tile upload ảnh tuần này (mock)
-class _UploadTile extends StatelessWidget {
-  final String label;
-  const _UploadTile({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () {
-            // TODO: mở picker
-          },
-          child: Container(
-            width: 92,
-            height: 92,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: const Center(child: Icon(Icons.add, size: 28)),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-      ],
     );
   }
 }

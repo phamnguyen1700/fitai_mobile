@@ -60,4 +60,7 @@ class ApiConstants {
   static const String mealMarkCompleted = '/mealplan/mark-completed';
   static const uploadWorkoutVideo = '/workoutplan/upload-video';
   static const markExerciseCompleted = '/workoutplan/mark-exercise-completed';
+
+  //process
+  static const String checkpointNote = '/checkpoints/note';
 }

@@ -70,12 +70,13 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
 
   void _initHeightsForDay(int dayIndex) {
     if (!_hasDays || dayIndex < 0 || dayIndex >= _days.length) {
-      _exerciseHeights = [0];
+      _exerciseHeights = [_minHeight];
       _currentExerciseIndex = 0;
       return;
     }
 
     final len = _days[dayIndex].exercises.length;
+
     _exerciseHeights = List<double>.filled(len > 0 ? len : 1, 0);
     _currentExerciseIndex = 0;
   }
@@ -263,19 +264,22 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
                 ),
               )
             else ...[
-              // Đo size thật của từng exercise (kèm comment)
               Offstage(
                 offstage: true,
                 child: Column(
                   children: [
                     for (int i = 0; i < exercises.length; i++)
-                      _MeasureSize(
-                        key: ValueKey(exercises[i].exerciseId),
-                        onChange: (size) => _onExerciseSize(i, size),
-                        child: _buildExerciseTile(
-                          exercises[i],
-                          _currentDay.dayNumber,
+                      _WorkoutExerciseWithComments(
+                        key: ValueKey('measure_${exercises[i].exerciseId}'),
+                        exercise: exercises[i],
+                        dayNumber: _currentDay.dayNumber,
+                        exerciseLogId: exercises[i].exerciseLogId ?? '',
+                        onVideoPicked: (localPath) => _handleUploadVideo(
+                          dayNumber: _currentDay.dayNumber,
+                          exercise: exercises[i],
+                          localPath: localPath,
                         ),
+                        onSizeChanged: (size) => _onExerciseSize(i, size),
                       ),
                   ],
                 ),
@@ -350,6 +354,7 @@ class _WorkoutExerciseWithComments extends ConsumerStatefulWidget {
     required this.dayNumber,
     required this.exerciseLogId,
     required this.onVideoPicked,
+    this.onSizeChanged,
     super.key,
   });
 
@@ -357,6 +362,7 @@ class _WorkoutExerciseWithComments extends ConsumerStatefulWidget {
   final int dayNumber;
   final String exerciseLogId;
   final Future<void> Function(String localPath) onVideoPicked;
+  final OnWidgetSizeChange? onSizeChanged;
 
   @override
   ConsumerState<_WorkoutExerciseWithComments> createState() =>
@@ -411,253 +417,268 @@ class _WorkoutExerciseWithCommentsState
     );
 
     // Có comment => 200, không có => thấp hơn (tuỳ em chỉnh)
-    final double commentSectionHeight = hasComments ? 200 : 110;
+    const double _noCommentHeight = 110;
+    const double _hasCommentHeight = 200;
+    final double commentSectionHeight = hasComments
+        ? _hasCommentHeight
+        : _noCommentHeight;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Tile bài tập gốc
-        ExerciseVideoLogTile(
-          title: widget.exercise.name,
-          category: widget.exercise.category,
-          sets: widget.exercise.sets,
-          reps: widget.exercise.reps,
-          minutes: widget.exercise.durationMinutes,
-          note: widget.exercise.note,
-          demoVideoUrl: widget.exercise.videoUrl,
-          existingLogVideoUrl: widget.exercise.videoLogUrl,
-          onVideoPicked: widget.onVideoPicked,
-        ),
+    // ✅ Bọc toàn bộ widget bằng _MeasureSize để báo size ra ngoài
+    return _MeasureSize(
+      onChange: (size) {
+        // callback cho TodayWorkoutPlanCard
+        if (widget.onSizeChanged != null) {
+          widget.onSizeChanged!(size);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Tile bài tập gốc
+          ExerciseVideoLogTile(
+            title: widget.exercise.name,
+            category: widget.exercise.category,
+            sets: widget.exercise.sets,
+            reps: widget.exercise.reps,
+            minutes: widget.exercise.durationMinutes,
+            note: widget.exercise.note,
+            demoVideoUrl: widget.exercise.videoUrl,
+            existingLogVideoUrl: widget.exercise.videoLogUrl,
+            onVideoPicked: widget.onVideoPicked,
+          ),
 
-        const SizedBox(height: 8),
+          const SizedBox(height: 8),
 
-        // Comment section thật
-        // Comment section thật
-        SizedBox(
-          height: commentSectionHeight,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
-            decoration: BoxDecoration(
-              color: cs.surface.withOpacity(0.6),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Tiêu đề
-                Row(
-                  children: [
-                    Text(
-                      'Nhận xét & trao đổi',
-                      style: t.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: cs.onSurface,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    asyncComments.maybeWhen(
-                      loading: () => SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.6,
-                          color: cs.primary,
+          // Comment section thật
+          SizedBox(
+            height: commentSectionHeight,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
+              decoration: BoxDecoration(
+                color: cs.surface.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: cs.outlineVariant),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Tiêu đề
+                  Row(
+                    children: [
+                      Text(
+                        'Nhận xét & trao đổi',
+                        style: t.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: cs.onSurface,
                         ),
                       ),
-                      orElse: () => const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 6),
-
-                // Danh sách comment
-                Expanded(
-                  child: asyncComments.when(
-                    loading: () => Align(
-                      alignment: Alignment.topLeft,
-                      child: Text(
-                        'Đang tải nhận xét...',
-                        style: t.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    error: (e, _) => Align(
-                      alignment: Alignment.topLeft,
-                      child: Text(
-                        'Không tải được nhận xét.',
-                        style: t.bodySmall?.copyWith(color: cs.error),
-                      ),
-                    ),
-                    data: (data) {
-                      final comments = data.comments;
-
-                      if (comments.isEmpty) {
-                        return Align(
-                          alignment: Alignment.topLeft,
-                          child: Text(
-                            'Chưa có nhận xét nào.',
-                            style: t.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
+                      const SizedBox(width: 6),
+                      asyncComments.maybeWhen(
+                        loading: () => SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.6,
+                            color: cs.primary,
                           ),
-                        );
-                      }
-
-                      return SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: comments.map((c) {
-                            final isCoach =
-                                c.senderType.toLowerCase() == 'advisor';
-
-                            final bubbleColor = isCoach
-                                ? cs.tertiaryContainer
-                                : cs.surfaceVariant;
-
-                            final textColor = isCoach
-                                ? cs.onTertiaryContainer
-                                : cs.onSurface;
-
-                            final icon = isCoach
-                                ? Icons.fitness_center_outlined
-                                : Icons.person_outline;
-
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 3),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    icon,
-                                    size: 16,
-                                    color: isCoach
-                                        ? cs.tertiary
-                                        : cs.onSurfaceVariant,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: bubbleColor,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  c.senderName ??
-                                                      (isCoach
-                                                          ? 'Coach'
-                                                          : 'Bạn'),
-                                                  style: t.labelSmall?.copyWith(
-                                                    fontWeight: FontWeight.w600,
-                                                    color: textColor
-                                                        .withOpacity(0.9),
-                                                  ),
-                                                ),
-                                              ),
-                                              InkWell(
-                                                onTap: () =>
-                                                    _handleDelete(c.id),
-                                                child: Icon(
-                                                  Icons.close_rounded,
-                                                  size: 14,
-                                                  color: textColor.withOpacity(
-                                                    0.6,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-
-                                          const SizedBox(height: 2),
-
-                                          Text(
-                                            c.content,
-                                            style: t.bodySmall?.copyWith(
-                                              color: textColor,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
                         ),
-                      );
-                    },
+                        orElse: () => const SizedBox.shrink(),
+                      ),
+                    ],
                   ),
-                ),
 
-                const SizedBox(height: 6),
+                  const SizedBox(height: 6),
 
-                // Ô nhập + nút gửi
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        minLines: 1,
-                        maxLines: 3,
-                        style: t.bodySmall,
-                        decoration: InputDecoration(
-                          hintText: 'Gửi câu hỏi cho coach...',
-                          hintStyle: t.bodySmall?.copyWith(
+                  // Danh sách comment
+                  Expanded(
+                    child: asyncComments.when(
+                      loading: () => Align(
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          'Đang tải nhận xét...',
+                          style: t.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
+                        ),
+                      ),
+                      error: (e, _) => Align(
+                        alignment: Alignment.topLeft,
+                        child: Text(
+                          'Không tải được nhận xét.',
+                          style: t.bodySmall?.copyWith(color: cs.error),
+                        ),
+                      ),
+                      data: (data) {
+                        final comments = data.comments;
+
+                        if (comments.isEmpty) {
+                          return Align(
+                            alignment: Alignment.topLeft,
+                            child: Text(
+                              'Chưa có nhận xét nào.',
+                              style: t.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: comments.map((c) {
+                              final isCoach =
+                                  c.senderType.toLowerCase() == 'advisor';
+
+                              final bubbleColor = isCoach
+                                  ? cs.tertiaryContainer
+                                  : cs.surfaceVariant;
+
+                              final textColor = isCoach
+                                  ? cs.onTertiaryContainer
+                                  : cs.onSurface;
+
+                              final icon = isCoach
+                                  ? Icons.fitness_center_outlined
+                                  : Icons.person_outline;
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 3,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      icon,
+                                      size: 16,
+                                      color: isCoach
+                                          ? cs.tertiary
+                                          : cs.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: bubbleColor,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    c.senderName ??
+                                                        (isCoach
+                                                            ? 'Coach'
+                                                            : 'Bạn'),
+                                                    style: t.labelSmall
+                                                        ?.copyWith(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: textColor
+                                                              .withOpacity(0.9),
+                                                        ),
+                                                  ),
+                                                ),
+                                                InkWell(
+                                                  onTap: () =>
+                                                      _handleDelete(c.id),
+                                                  child: Icon(
+                                                    Icons.close_rounded,
+                                                    size: 14,
+                                                    color: textColor
+                                                        .withOpacity(0.6),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              c.content,
+                                              style: t.bodySmall?.copyWith(
+                                                color: textColor,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
                           ),
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(999),
-                            borderSide: BorderSide(color: cs.outlineVariant),
+                        );
+                      },
+                    ),
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // Ô nhập + nút gửi
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          minLines: 1,
+                          maxLines: 3,
+                          style: t.bodySmall,
+                          decoration: InputDecoration(
+                            hintText: 'Gửi câu hỏi cho coach...',
+                            hintStyle: t.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(999),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    IconButton(
-                      icon: isSubmitting
-                          ? SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
+                      const SizedBox(width: 6),
+                      IconButton(
+                        icon: isSubmitting
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: cs.primary,
+                                ),
+                              )
+                            : Icon(
+                                Icons.send_rounded,
+                                size: 18,
                                 color: cs.primary,
                               ),
-                            )
-                          : Icon(
-                              Icons.send_rounded,
-                              size: 18,
-                              color: cs.primary,
-                            ),
-                      onPressed: isSubmitting ? null : _handleSend,
-                    ),
-                  ],
-                ),
-              ],
+                        onPressed: isSubmitting ? null : _handleSend,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
