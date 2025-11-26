@@ -630,5 +630,68 @@ final aiHealthPlanCreateControllerProvider =
     );
 
 typedef _$AiHealthPlanCreateController = AutoDisposeNotifier<AsyncValue<void>>;
+String _$workoutPlanSaveAllControllerHash() =>
+    r'ba9f3629b9d445074d0fd907acfb6d10f796cf14';
+
+/// See also [WorkoutPlanSaveAllController].
+@ProviderFor(WorkoutPlanSaveAllController)
+final workoutPlanSaveAllControllerProvider =
+    AutoDisposeNotifierProvider<
+      WorkoutPlanSaveAllController,
+      AsyncValue<WorkoutPlanSaveAllResponse?>
+    >.internal(
+      WorkoutPlanSaveAllController.new,
+      name: r'workoutPlanSaveAllControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$workoutPlanSaveAllControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$WorkoutPlanSaveAllController =
+    AutoDisposeNotifier<AsyncValue<WorkoutPlanSaveAllResponse?>>;
+String _$mealPlanSaveBatchControllerHash() =>
+    r'baeb81cdd9aaa278a201073a1317010bb6926d1c';
+
+/// See also [MealPlanSaveBatchController].
+@ProviderFor(MealPlanSaveBatchController)
+final mealPlanSaveBatchControllerProvider =
+    AutoDisposeNotifierProvider<
+      MealPlanSaveBatchController,
+      AsyncValue<MealPlanSaveBatchResponse?>
+    >.internal(
+      MealPlanSaveBatchController.new,
+      name: r'mealPlanSaveBatchControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$mealPlanSaveBatchControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$MealPlanSaveBatchController =
+    AutoDisposeNotifier<AsyncValue<MealPlanSaveBatchResponse?>>;
+String _$aiHealthPlanActivateControllerHash() =>
+    r'e6f0359848b2efc3e1c4ff2b7a18aff4a25c6a9e';
+
+/// See also [AiHealthPlanActivateController].
+@ProviderFor(AiHealthPlanActivateController)
+final aiHealthPlanActivateControllerProvider =
+    AutoDisposeNotifierProvider<
+      AiHealthPlanActivateController,
+      AsyncValue<AiHealthPlanActivateResponse?>
+    >.internal(
+      AiHealthPlanActivateController.new,
+      name: r'aiHealthPlanActivateControllerProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$aiHealthPlanActivateControllerHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$AiHealthPlanActivateController =
+    AutoDisposeNotifier<AsyncValue<AiHealthPlanActivateResponse?>>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

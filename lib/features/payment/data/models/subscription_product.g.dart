@@ -16,6 +16,7 @@ SubscriptionProduct _$SubscriptionProductFromJson(Map<String, dynamic> json) =>
       currency: json['currency'] as String,
       interval: $enumDecode(_$BillingIntervalEnumMap, json['interval']),
       isActive: json['isActive'] as bool,
+      isAdvisor: json['isAdvisor'] as bool,
       startDate: json['startDate'] == null
           ? null
           : DateTime.parse(json['startDate'] as String),
@@ -42,6 +43,7 @@ Map<String, dynamic> _$SubscriptionProductToJson(
   'currency': instance.currency,
   'interval': _$BillingIntervalEnumMap[instance.interval]!,
   'isActive': instance.isActive,
+  'isAdvisor': instance.isAdvisor,
   'startDate': instance.startDate?.toIso8601String(),
   'endDate': instance.endDate?.toIso8601String(),
   'id': instance.id,

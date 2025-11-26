@@ -7,9 +7,9 @@ PreferredSizeWidget? buildUserHeaderFor(WidgetRef ref, String path) {
   if (path != '/daily' && path != '/progress') return null;
 
   // dữ liệu tạm
-  const displayName = 'Thảo Vi';
-  const avatarUrl = 'https://i.pravatar.cc/150?img=5';
-  const message = 'Chào Vi 👋, hôm nay bạn có 3 bài tập và 4 bữa ăn.';
+  const displayName = 'Cao Nguyên';
+  const avatarAsset = 'lib/core/assets/images/avt.png';
+  const message = 'Chào Nguyên 👋, hôm nay bạn có 3 bài tập và 4 bữa ăn.';
   const welcome = 'Welcome';
   const headerH = 100.0;
 
@@ -25,7 +25,7 @@ PreferredSizeWidget? buildUserHeaderFor(WidgetRef ref, String path) {
           children: [
             const CircleAvatar(
               radius: 24,
-              backgroundImage: NetworkImage(avatarUrl),
+              backgroundImage: AssetImage(avatarAsset),
             ),
             const SizedBox(width: 12),
             Expanded(

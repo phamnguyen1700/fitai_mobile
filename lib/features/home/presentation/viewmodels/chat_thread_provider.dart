@@ -115,3 +115,110 @@ Future<List<WorkoutPlanDay>> workoutPlanDays(WorkoutPlanDaysRef ref) async {
   // resp.data.data.workoutPlan
   return resp.data.data.workoutPlan;
 }
+
+// ===================== SAVE WORKOUT PLAN (SAVE-ALL) ===================== //
+
+@riverpod
+class WorkoutPlanSaveAllController extends _$WorkoutPlanSaveAllController {
+  @override
+  AsyncValue<WorkoutPlanSaveAllResponse?> build() => const AsyncData(null);
+
+  /// Gửi thẳng List<WorkoutPlanSaveDayRequest> xuống API
+  Future<WorkoutPlanSaveAllResponse> saveFromDays(
+    List<WorkoutPlanSaveDayRequest> days,
+  ) async {
+    final repo = ref.read(chatThreadRepositoryProvider);
+
+    state = const AsyncLoading();
+    try {
+      final result = await repo.saveWorkoutPlanAll(days);
+      state = AsyncData(result);
+      return result;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+
+  /// Helper: nhận List<WorkoutPlanDay> (từ generate) rồi tự convert & save
+  Future<WorkoutPlanSaveAllResponse> saveFromGenerateDays(
+    List<WorkoutPlanDay> days,
+  ) async {
+    final repo = ref.read(chatThreadRepositoryProvider);
+
+    state = const AsyncLoading();
+    try {
+      final result = await repo.saveWorkoutPlanAllFromGenerate(days);
+      state = AsyncData(result);
+      return result;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+}
+
+// ===================== SAVE MEAL PLAN (SAVE-BATCH) ===================== //
+
+@riverpod
+class MealPlanSaveBatchController extends _$MealPlanSaveBatchController {
+  @override
+  AsyncValue<MealPlanSaveBatchResponse?> build() => const AsyncData(null);
+
+  /// Gửi thẳng List<MealPlanSaveBatchDayRequest> xuống API
+  Future<MealPlanSaveBatchResponse> saveFromDays(
+    List<MealPlanSaveBatchDayRequest> days,
+  ) async {
+    final repo = ref.read(chatThreadRepositoryProvider);
+
+    state = const AsyncLoading();
+    try {
+      final result = await repo.saveMealPlanBatch(days);
+      state = AsyncData(result);
+      return result;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+
+  /// Helper: nhận List<DailyMealPlan> (từ generate) rồi tự convert & save
+  Future<MealPlanSaveBatchResponse> saveFromGenerateDays(
+    List<DailyMealPlan> days,
+  ) async {
+    final repo = ref.read(chatThreadRepositoryProvider);
+
+    state = const AsyncLoading();
+    try {
+      final result = await repo.saveMealPlanBatchFromGenerate(days);
+      state = AsyncData(result);
+      return result;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+}
+
+// ===================== ACTIVATE AI HEALTH PLAN ===================== //
+
+@riverpod
+class AiHealthPlanActivateController extends _$AiHealthPlanActivateController {
+  @override
+  AsyncValue<AiHealthPlanActivateResponse?> build() => const AsyncData(null);
+
+  /// Gọi sau khi đã save workout & meal thành công
+  Future<AiHealthPlanActivateResponse> activate() async {
+    final repo = ref.read(chatThreadRepositoryProvider);
+
+    state = const AsyncLoading();
+    try {
+      final resp = await repo.activateAiHealthPlan();
+      state = AsyncData(resp);
+      return resp;
+    } catch (e, st) {
+      state = AsyncError(e, st);
+      rethrow;
+    }
+  }
+}

@@ -1,7 +1,7 @@
 // lib/features/home/presentation/views/plan_preview_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:fitai_mobile/features/home/presentation/viewmodels/home_state.dart';
 import 'package:fitai_mobile/features/home/data/models/chat_thread_models.dart';
 import 'package:fitai_mobile/features/home/presentation/viewmodels/chat_thread_provider.dart';
 import 'package:fitai_mobile/features/daily/presentation/widgets/daily_date_selector.dart';
@@ -28,6 +28,9 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
   /// index ngày WORKOUT đang chọn
   int _selectedWorkoutIndex = 0;
 
+  /// trạng thái bấm nút xác nhận
+  bool _isConfirming = false;
+
   DateTime _dateFromIndex(int index) {
     return _baseDate.add(Duration(days: index));
   }
@@ -37,6 +40,75 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
     final clamped = diff.clamp(0, maxDays - 1);
     if (clamped != _selectedIndex) {
       setState(() => _selectedIndex = clamped);
+    }
+  }
+
+  Future<void> _onConfirmPressed() async {
+    if (_isConfirming) return;
+
+    setState(() => _isConfirming = true);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      // 1) Lấy data generate sẵn
+      final workoutDays = await ref.read(workoutPlanDaysProvider.future);
+      final mealDays = await ref.read(mealPlanDailyMealsProvider.future);
+
+      if (workoutDays.isEmpty || mealDays.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Plan chưa đầy đủ để kích hoạt. Vui lòng thử lại sau.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      // 2) Lưu workout plan
+      final workoutSaver = ref.read(
+        workoutPlanSaveAllControllerProvider.notifier,
+      );
+      await workoutSaver.saveFromGenerateDays(workoutDays);
+
+      // 3) Lưu meal plan
+      final mealSaver = ref.read(mealPlanSaveBatchControllerProvider.notifier);
+      await mealSaver.saveFromGenerateDays(mealDays);
+
+      // 4) Activate plan
+      final activator = ref.read(
+        aiHealthPlanActivateControllerProvider.notifier,
+      );
+      final activateResp = await activator.activate();
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            activateResp.data.isNotEmpty
+                ? activateResp.data
+                : 'Đã kích hoạt plan thành công!',
+          ),
+        ),
+      );
+
+      // ✅ Clear cache plan nếu muốn
+      ref.invalidate(workoutPlanGenerateProvider);
+      ref.invalidate(workoutPlanDaysProvider);
+      ref.invalidate(mealPlanGenerateProvider);
+      ref.invalidate(mealPlanDailyMealsProvider);
+
+      // ✅ QUAY VỀ MÀN CHAT (message list)
+      if (mounted) {
+        ref.read(homeViewProvider.notifier).state = HomeView.chat;
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Có lỗi xảy ra khi lưu & kích hoạt plan: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isConfirming = false);
+      }
     }
   }
 
@@ -266,7 +338,8 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                                           dayTitle:
                                               'Day ${workoutDays[index].dayNumber}',
                                           featuredTitle:
-                                              workoutDays[index].sessionName,
+                                              workoutDays[index].sessionName ??
+                                              'Buổi tập',
                                           totalExercises: workoutDays[index]
                                               .exercises
                                               .length,
@@ -305,7 +378,7 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                                         child: ExerciseVideo(
                                           title: ex.name,
                                           thumbUrl: '',
-                                          category: ex.category,
+                                          category: ex.category ?? 'Khác',
                                           sets: ex.sets,
                                           reps: ex.reps,
                                           minutes: ex.durationMinutes,
@@ -339,6 +412,29 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                   ],
                 );
               },
+            ),
+          ),
+
+          const SizedBox(height: 8),
+          SafeArea(
+            top: false,
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _isConfirming ? null : _onConfirmPressed,
+                icon: _isConfirming
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle_outline),
+                label: Text(
+                  _isConfirming
+                      ? 'Đang lưu & kích hoạt plan...'
+                      : 'Xác nhận & kích hoạt plan',
+                ),
+              ),
             ),
           ),
         ],

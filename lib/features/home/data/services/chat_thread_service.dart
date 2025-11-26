@@ -109,4 +109,54 @@ class ChatThreadService {
       res.data as Map<String, dynamic>,
     );
   }
+
+  // ========== WORKOUT PLAN: POST /api/aihealthplan/workout-plan/save-all ==========
+  /// Raw: body là List<WorkoutPlanSaveDayRequest>
+  Future<Response<dynamic>> saveWorkoutPlanAllRaw(
+    List<WorkoutPlanSaveDayRequest> days,
+  ) {
+    final body = days.map((e) => e.toJson()).toList();
+    return _client.post<dynamic>(ApiConstants.workoutPlanSaveAll, data: body);
+  }
+
+  /// Typed: parse về WorkoutPlanSaveAllResponse (success + message)
+  Future<WorkoutPlanSaveAllResponse> saveWorkoutPlanAll(
+    List<WorkoutPlanSaveDayRequest> days,
+  ) async {
+    final res = await saveWorkoutPlanAllRaw(days);
+    return WorkoutPlanSaveAllResponse.fromJson(
+      res.data as Map<String, dynamic>,
+    );
+  }
+
+  // ========== MEAL PLAN: POST /api/aihealthplan/meal-plan/save-batch ==========
+  /// Raw: body là List<MealPlanSaveBatchDayRequest>
+  Future<Response<dynamic>> saveMealPlanBatchRaw(
+    List<MealPlanSaveBatchDayRequest> days,
+  ) {
+    final body = days.map((e) => e.toJson()).toList();
+    return _client.post<dynamic>(ApiConstants.mealPlanSaveBatch, data: body);
+  }
+
+  /// Typed: parse về MealPlanSaveBatchResponse (success + message)
+  Future<MealPlanSaveBatchResponse> saveMealPlanBatch(
+    List<MealPlanSaveBatchDayRequest> days,
+  ) async {
+    final res = await saveMealPlanBatchRaw(days);
+    return MealPlanSaveBatchResponse.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  // ========== AI HEALTH PLAN: POST /api/aihealthplan/activate ==========
+  /// Raw: kích hoạt plan hiện tại của user, không cần body
+  Future<Response<dynamic>> activateAiHealthPlanRaw() {
+    return _client.post<dynamic>(ApiConstants.aiHealthPlanActivate);
+  }
+
+  /// Typed: parse về AiHealthPlanActivateResponse
+  Future<AiHealthPlanActivateResponse> activateAiHealthPlan() async {
+    final res = await activateAiHealthPlanRaw();
+    return AiHealthPlanActivateResponse.fromJson(
+      res.data as Map<String, dynamic>,
+    );
+  }
 }

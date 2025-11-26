@@ -380,7 +380,7 @@ Map<String, dynamic> _$WorkoutPlanCoreDataToJson(
 WorkoutPlanDay _$WorkoutPlanDayFromJson(Map<String, dynamic> json) =>
     WorkoutPlanDay(
       dayNumber: (json['dayNumber'] as num).toInt(),
-      sessionName: json['sessionName'] as String,
+      sessionName: json['sessionName'] as String?,
       exercises: (json['exercises'] as List<dynamic>)
           .map((e) => WorkoutExercise.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -395,14 +395,14 @@ Map<String, dynamic> _$WorkoutPlanDayToJson(WorkoutPlanDay instance) =>
 
 WorkoutExercise _$WorkoutExerciseFromJson(Map<String, dynamic> json) =>
     WorkoutExercise(
-      exerciseId: json['exerciseId'] as String,
+      exerciseId: json['exerciseId'] as String?,
       name: json['name'] as String,
       sets: (json['sets'] as num?)?.toInt(),
       reps: (json['reps'] as num?)?.toInt(),
       durationMinutes: (json['durationMinutes'] as num?)?.toInt(),
-      category: json['category'] as String,
-      videoUrl: json['videoUrl'] as String,
-      note: json['note'] as String,
+      category: json['category'] as String?,
+      videoUrl: json['videoUrl'] as String?,
+      note: json['note'] as String?,
     );
 
 Map<String, dynamic> _$WorkoutExerciseToJson(WorkoutExercise instance) =>
@@ -416,3 +416,113 @@ Map<String, dynamic> _$WorkoutExerciseToJson(WorkoutExercise instance) =>
       'videoUrl': instance.videoUrl,
       'note': instance.note,
     };
+
+WorkoutPlanSaveDayRequest _$WorkoutPlanSaveDayRequestFromJson(
+  Map<String, dynamic> json,
+) => WorkoutPlanSaveDayRequest(
+  dayNumber: (json['dayNumber'] as num).toInt(),
+  sessionName: json['sessionName'] as String?,
+  exercises: (json['exercises'] as List<dynamic>)
+      .map(
+        (e) => WorkoutExerciseSaveRequest.fromJson(e as Map<String, dynamic>),
+      )
+      .toList(),
+);
+
+Map<String, dynamic> _$WorkoutPlanSaveDayRequestToJson(
+  WorkoutPlanSaveDayRequest instance,
+) => <String, dynamic>{
+  'dayNumber': instance.dayNumber,
+  'sessionName': instance.sessionName,
+  'exercises': instance.exercises.map((e) => e.toJson()).toList(),
+};
+
+WorkoutExerciseSaveRequest _$WorkoutExerciseSaveRequestFromJson(
+  Map<String, dynamic> json,
+) => WorkoutExerciseSaveRequest(
+  exerciseId: json['exerciseId'] as String?,
+  name: json['name'] as String,
+  sets: (json['sets'] as num?)?.toInt(),
+  reps: json['reps'] as String?,
+  durationMinutes: (json['durationMinutes'] as num?)?.toInt(),
+  category: json['category'] as String?,
+  videoUrl: json['videoUrl'] as String?,
+  note: json['note'] as String?,
+);
+
+Map<String, dynamic> _$WorkoutExerciseSaveRequestToJson(
+  WorkoutExerciseSaveRequest instance,
+) => <String, dynamic>{
+  'exerciseId': instance.exerciseId,
+  'name': instance.name,
+  'sets': instance.sets,
+  'reps': instance.reps,
+  'durationMinutes': instance.durationMinutes,
+  'category': instance.category,
+  'videoUrl': instance.videoUrl,
+  'note': instance.note,
+};
+
+WorkoutPlanSaveAllResponse _$WorkoutPlanSaveAllResponseFromJson(
+  Map<String, dynamic> json,
+) => WorkoutPlanSaveAllResponse(
+  data: json['data'] as String?,
+  success: json['success'] as bool,
+  message: json['message'] as String?,
+);
+
+Map<String, dynamic> _$WorkoutPlanSaveAllResponseToJson(
+  WorkoutPlanSaveAllResponse instance,
+) => <String, dynamic>{
+  'data': instance.data,
+  'success': instance.success,
+  'message': instance.message,
+};
+
+MealPlanSaveBatchDayRequest _$MealPlanSaveBatchDayRequestFromJson(
+  Map<String, dynamic> json,
+) => MealPlanSaveBatchDayRequest(
+  dayNumber: (json['dayNumber'] as num).toInt(),
+  meals: (json['meals'] as List<dynamic>)
+      .map((e) => MealItem.fromJson(e as Map<String, dynamic>))
+      .toList(),
+);
+
+Map<String, dynamic> _$MealPlanSaveBatchDayRequestToJson(
+  MealPlanSaveBatchDayRequest instance,
+) => <String, dynamic>{
+  'dayNumber': instance.dayNumber,
+  'meals': instance.meals.map((e) => e.toJson()).toList(),
+};
+
+MealPlanSaveBatchResponse _$MealPlanSaveBatchResponseFromJson(
+  Map<String, dynamic> json,
+) => MealPlanSaveBatchResponse(
+  data: json['data'] as String?,
+  success: json['success'] as bool,
+  message: json['message'] as String?,
+);
+
+Map<String, dynamic> _$MealPlanSaveBatchResponseToJson(
+  MealPlanSaveBatchResponse instance,
+) => <String, dynamic>{
+  'data': instance.data,
+  'success': instance.success,
+  'message': instance.message,
+};
+
+AiHealthPlanActivateResponse _$AiHealthPlanActivateResponseFromJson(
+  Map<String, dynamic> json,
+) => AiHealthPlanActivateResponse(
+  data: json['data'] as String,
+  success: json['success'] as bool,
+  message: json['message'] as String?,
+);
+
+Map<String, dynamic> _$AiHealthPlanActivateResponseToJson(
+  AiHealthPlanActivateResponse instance,
+) => <String, dynamic>{
+  'data': instance.data,
+  'success': instance.success,
+  'message': instance.message,
+};

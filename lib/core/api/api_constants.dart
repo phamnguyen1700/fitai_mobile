@@ -20,6 +20,7 @@ class ApiConstants {
   static const String activityLevels = '/api/metadata/activity-levels';
   static const String subscriptionProducts = '/subscription/active-products';
   static const String bodygramUpload = '/bodygram/upload-body-images';
+  static const String bodygramAnalyze = '/bodygram/analyze-body-images';
   static const String dietaryPreference = '/dietarypreference';
 
   // User endpoints
@@ -53,6 +54,11 @@ class ApiConstants {
   static const String workoutPlanGenerate = '/api/workoutplan/generate';
   static const previousCheckpointCompletionPercent =
       '/checkpoints/previous/completion-percent';
+  static const String workoutPlanSaveAll =
+      '/api/aihealthplan/workout-plan/save-all';
+  static const String mealPlanSaveBatch =
+      '/api/aihealthplan/meal-plan/save-batch';
+  static const aiHealthPlanActivate = '/api/aihealthplan/activate';
   static const checkpointsLineChart = '/checkpoints/linechart';
   static const checkpointsPieChart = '/checkpoints/piechart';
   static const String workoutPlanSchedule = '/workoutplan/schedule';
@@ -63,4 +69,13 @@ class ApiConstants {
 
   //process
   static const String checkpointNote = '/checkpoints/note';
+  static const String checkpointsAchievement = '/checkpoints/achievement';
+  static const prepareNextCheckpoint = "/aihealthplan/prepare-next-checkpoint";
+  static const nextTarget = "/checkpoints/next-target";
+  static const generateMealPlanWithTarget = "/mealplan/generate-with-target";
+
+  //checkout
+  static const String paymentCreate = '/payment/create';
+  static const String advisorList = '/advisor';
+  static const String advisorAssign = '/advisor/assign-advisor';
 }

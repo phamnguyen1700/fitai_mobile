@@ -68,7 +68,7 @@ extension ProfileDraftDietDto on ProfileDraft {
   Map<String, dynamic> toDietDto() => {
     'mealsPerDay': mealsPerDay,
     'cuisineType': cuisineType,
-    'allergies': allergies,
+    'allergies': allergies ?? '',
     'preferredIngredients': preferredIngredients.isNotEmpty
         ? preferredIngredients.join(', ')
         : null,
@@ -1179,7 +1179,7 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                   ? null
                   : _cuisineCtl.text.trim(),
               allergies: _allergyCtl.text.trim().isEmpty
-                  ? null
+                  ? ''
                   : _allergyCtl.text.trim(),
               preferredIngredients: joinOrNull(_preferred),
               avoidIngredients: joinOrNull(_parseFreeTextToSet(_avoidCtl.text)),

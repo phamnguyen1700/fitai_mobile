@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:fitai_mobile/core/widgets/widgets.dart';
-
+import 'package:fitai_mobile/core/router/app_router.dart';
 import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
 
 class AuthBottomSheet {
@@ -16,22 +16,35 @@ class AuthBottomSheet {
   }
 }
 
-class _AuthSheetContent extends StatefulWidget {
-  const _AuthSheetContent();
+class _AuthSheetContent extends ConsumerStatefulWidget {
+  const _AuthSheetContent({super.key});
 
   @override
-  State<_AuthSheetContent> createState() => _AuthSheetContentState();
+  ConsumerState<_AuthSheetContent> createState() => _AuthSheetContentState();
 }
 
-class _AuthSheetContentState extends State<_AuthSheetContent>
+class _AuthSheetContentState extends ConsumerState<_AuthSheetContent>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(
-    length: 2,
-    vsync: this,
-  );
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    // indexIsChanging = true trong lúc user chuyển tab
+    if (_tabController.indexIsChanging) {
+      // 🔥 clear error mỗi lần đổi tab
+      ref.read(authNotifierProvider.notifier).clearError();
+    }
+  }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -44,7 +57,6 @@ class _AuthSheetContentState extends State<_AuthSheetContent>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Tabs: Đăng nhập / Đăng ký
             TabBar(
               controller: _tabController,
               tabs: const [
@@ -53,8 +65,6 @@ class _AuthSheetContentState extends State<_AuthSheetContent>
               ],
             ),
             const SizedBox(height: 16),
-
-            // Nội dung form
             SizedBox(
               height: 360,
               child: TabBarView(
@@ -83,6 +93,16 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   final _passCtl = TextEditingController();
   bool _rememberMe = false;
 
+  String? _loginPasswordValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Vui lòng nhập mật khẩu';
+    }
+    if (value.length < 6) {
+      return 'Mật khẩu phải có ít nhất 6 ký tự';
+    }
+    return null; // hợp lệ
+  }
+
   @override
   void dispose() {
     _emailCtl.dispose();
@@ -91,67 +111,80 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   }
 
   Future<void> _submit() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Gọi login qua notifier
-      await ref
-          .read(authNotifierProvider.notifier)
-          .login(
-            email: _emailCtl.text.trim(),
-            password: _passCtl.text,
-            rememberMe: _rememberMe,
-          );
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-      // Lấy state sau khi login
-      final authState = ref.read(authNotifierProvider).value;
-
-      if (authState?.isAuthenticated == true) {
-        if (!mounted) return;
-
-        // 👇 Lấy bước onboarding từ user
-        final step = authState!.user?.onboardingStep;
-
-        String target;
-
-        switch (step) {
-          case null:
-          case 'None':
-          case 'Profile':
-            target = '/setup/overview';
-            break;
-
-          case 'BodyImage':
-            target = '/setup/body';
-            break;
-
-          case 'DietaryPreference':
-            target = '/setup/diet';
-            break;
-
-          default:
-            target = '/home';
-            break;
-        }
-
-        // Đóng bottom sheet nếu đang mở
-        Navigator.of(context).pop();
-
-        // Điều hướng đến màn tương ứng
-        context.go(target);
-
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Chào mừng bạn quay lại 👋')));
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Đăng nhập thành công! Chào mừng ${authState.user?.email ?? 'bạn'}!',
-            ),
-            backgroundColor: Colors.green,
-          ),
+    // Gọi login qua notifier
+    await ref
+        .read(authNotifierProvider.notifier)
+        .login(
+          email: _emailCtl.text.trim(),
+          password: _passCtl.text,
+          rememberMe: _rememberMe,
         );
-      }
+
+    // Lấy state sau khi login
+    final asyncAuth = ref.read(authNotifierProvider);
+    final authState = asyncAuth.value; // AuthState? hoặc null
+
+    if (!mounted) return;
+
+    // Nếu vì lý do gì đó state chưa có value
+    if (authState == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Có lỗi xảy ra. Vui lòng thử lại.')),
+      );
+      return;
     }
+
+    // ❌ LOGIN FAIL → KHÔNG ĐIỀU HƯỚNG
+    if (!authState.isAuthenticated) {
+      final msg =
+          authState.error ??
+          'Đăng nhập thất bại. Vui lòng kiểm tra email/mật khẩu.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+      return;
+    }
+
+    // ✅ LOGIN OK → ĐIỀU HƯỚNG
+    final step = authState.user?.onboardingStep;
+
+    String target;
+    switch (step) {
+      case null:
+      case 'None':
+      case 'Profile':
+        target = '/setup/overview';
+        break;
+      case 'BodyImage':
+        target = '/setup/body';
+        break;
+      case 'DietaryPreference':
+        target = '/setup/diet';
+        break;
+      default:
+        target = '/home';
+        break;
+    }
+
+    // Đóng bottom sheet nếu đang mở
+    Navigator.of(context).pop();
+
+    // Điều hướng đến màn tương ứng
+    context.go(target);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Đăng nhập thành công! Chào mừng ${authState.user?.email ?? 'bạn'}!',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   @override
@@ -190,7 +223,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             prefixIcon: Icons.lock_outline,
             hintText: 'Nhập mật khẩu',
             obscure: true,
-            validator: V.password(),
+            validator: _loginPasswordValidator,
           ),
 
           const SizedBox(height: 8),
@@ -246,7 +279,6 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   }
 }
 
-// === FORM ĐĂNG KÝ ===
 class _RegisterForm extends ConsumerStatefulWidget {
   const _RegisterForm();
 
@@ -269,59 +301,73 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
   }
 
   Future<void> _submit() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      // Validate password confirmation
-      if (_passCtl.text != _confirmCtl.text) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mật khẩu xác nhận không khớp'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-      // Call API through provider
-      await ref
-          .read(authNotifierProvider.notifier)
-          .register(
-            email: _emailCtl.text.trim(),
-            password: _passCtl.text,
-            passwordConfirmation: _confirmCtl.text,
-          );
-
-      // Check if registration was successful -> go to OTP (verification)
-      final authState = ref.read(authNotifierProvider).value;
-      if (authState?.error == null) {
-        if (mounted) {
-          Navigator.of(context).pop(); // Close the bottom sheet
-          context.go(
-            '/verification',
-            extra: _emailCtl.text.trim(),
-          ); // Navigate to OTP screen with email
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Đăng ký thành công! Vui lòng nhập mã OTP.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đăng ký thất bại: ${authState!.error}'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (_passCtl.text != _confirmCtl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Mật khẩu xác nhận không khớp'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
     }
+
+    ref.read(authNotifierProvider.notifier).clearError();
+
+    final email = _emailCtl.text.trim();
+    final password = _passCtl.text;
+
+    await ref
+        .read(authNotifierProvider.notifier)
+        .register(
+          email: email,
+          password: password,
+          passwordConfirmation: _confirmCtl.text,
+        );
+
+    final authAsync = ref.read(authNotifierProvider);
+    final authState = authAsync.value;
+
+    if (!mounted) return;
+
+    if (authState?.error != null) {
+      return;
+    }
+
+    Navigator.of(context).pop(); // đóng bottom sheet
+
+    context.goNamed(
+      AppRoute.verification.name,
+      extra: {'email': email, 'password': password},
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đăng ký thành công! Vui lòng nhập mã OTP.'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+
+    // Lấy error chung từ authErrorProvider
+    final rawError = ref.watch(authErrorProvider);
+
+    // Map message BE → tiếng Việt cho user
+    String? errorText;
+    if (rawError != null && rawError.isNotEmpty) {
+      if (rawError.contains('Email is already registered')) {
+        errorText = 'Email này đã được đăng ký, vui lòng dùng email khác.';
+      } else {
+        errorText = rawError; // fallback: dùng nguyên message
+      }
+    }
+
+    final isLoading = ref.watch(isAuthLoadingProvider);
 
     return Form(
       key: _formKey,
@@ -368,19 +414,26 @@ class _RegisterFormState extends ConsumerState<_RegisterForm> {
             obscure: true,
             validator: V.confirm(_passCtl),
           ),
-          const SizedBox(height: 16),
 
-          Consumer(
-            builder: (context, ref, child) {
-              final isLoading = ref.watch(isAuthLoadingProvider);
+          const SizedBox(height: 8),
 
-              return AppButton(
-                label: isLoading ? 'Đang đăng ký...' : 'Đăng ký',
-                variant: AppButtonVariant.filled,
-                fullWidth: true,
-                onPressed: isLoading ? null : _submit,
-              );
-            },
+          // 🔻 Hiển thị lỗi từ BE ngay dưới form
+          if (errorText != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                errorText,
+                style: TextStyle(color: cs.error, fontSize: 13),
+              ),
+            ),
+
+          const SizedBox(height: 8),
+
+          AppButton(
+            label: isLoading ? 'Đang đăng ký...' : 'Đăng ký',
+            variant: AppButtonVariant.filled,
+            fullWidth: true,
+            onPressed: isLoading ? null : _submit,
           ),
         ],
       ),

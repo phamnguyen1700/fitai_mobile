@@ -17,8 +17,8 @@ class ApiConfig {
   static const String FITNESS_PROD_URL = 'https://api.fitai.com/fitness';
 
   /// 🧪 Development URLs
-  static const String ACCOUNT_DEV_URL = 'http://54.179.34.55:8081';
-  static const String FITNESS_DEV_URL = 'http://54.179.34.55:8082';
+  static const String ACCOUNT_DEV_URL = 'http://52.64.148.181:8081';
+  static const String FITNESS_DEV_URL = 'http://52.64.148.181:8082';
 
   /// 🖥 Local development (optional)
   static const String ACCOUNT_LOCAL_URL = 'http://localhost:8001';

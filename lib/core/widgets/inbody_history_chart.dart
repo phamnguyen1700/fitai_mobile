@@ -11,12 +11,20 @@ class InbodyRecord {
   final double smm;
   final double pbf;
 
+  /// URL ảnh chính diện (front)
+  final String? frontImageUrl;
+
+  /// URL ảnh bên hông (right)
+  final String? rightImageUrl;
+
   InbodyRecord({
     required this.checkpointNumber,
     this.measuredAt,
     required this.weight,
     required this.smm,
     required this.pbf,
+    this.frontImageUrl,
+    this.rightImageUrl,
   });
 }
 
@@ -185,7 +193,25 @@ class _MetricLineChart extends StatelessWidget {
                     show: true,
                     drawVerticalLine: true,
                     horizontalInterval: (maxY - minY) / 2,
-                    verticalInterval: 1,
+                    // Không set verticalInterval để tránh tự động tạo grid line cho tất cả số nguyên
+                    // Thay vào đó dùng getDrawingVerticalLine để chỉ vẽ tại checkpoint
+                    getDrawingVerticalLine: (value) {
+                      // Chỉ vẽ grid line tại đúng vị trí checkpoint (số nguyên)
+                      if (value % 1 != 0) {
+                        return FlLine(
+                          color: Colors.transparent,
+                          strokeWidth: 0,
+                        );
+                      }
+                      final cp = value.toInt();
+                      final exists = data.any((r) => r.checkpointNumber == cp);
+                      return FlLine(
+                        color: exists
+                            ? cs.outlineVariant.withOpacity(0.3)
+                            : Colors.transparent,
+                        strokeWidth: exists ? 1 : 0,
+                      );
+                    },
                   ),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
@@ -202,10 +228,16 @@ class _MetricLineChart extends StatelessWidget {
                       sideTitles: SideTitles(
                         showTitles: showCheckpointLabels,
                         reservedSize: showCheckpointLabels ? 22 : 0,
+                        interval: 1,
                         getTitlesWidget: (value, meta) {
+                          // Chỉ hiển thị nếu giá trị là số nguyên chính xác
+                          if (value % 1 != 0) {
+                            return const SizedBox.shrink();
+                          }
+
                           final cp = value.toInt();
 
-                          // Chỉ hiển thị nếu thực sự có checkpoint đó trong data
+                          // Chỉ hiển thị nếu checkpoint thực sự tồn tại trong data
                           final exists = data.any(
                             (r) => r.checkpointNumber == cp,
                           );

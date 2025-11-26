@@ -8,7 +8,7 @@ class WelcomeScreen extends StatelessWidget {
 
   void _onGetStarted(BuildContext context) {
     // 👉 Điều hướng đến tab chính /home bằng GoRouter
-    context.go('/progress');
+    context.go('/payment/result/success');
   }
 
   void _onLogin(BuildContext context) {

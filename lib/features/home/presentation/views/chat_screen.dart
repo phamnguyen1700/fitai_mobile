@@ -134,6 +134,9 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
   /// Lưu welcome message AI của thread vừa tạo
   final Map<String, String> _initialAiMessages = {};
 
+  /// Đảm bảo chỉ auto-tạo thread đầu tiên 1 lần
+  bool _autoCreatedFirstThread = false;
+
   Future<void> _createNewConversation() async {
     try {
       // Gọi API tạo thread mới
@@ -168,41 +171,19 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
         child: Text('Không tải được danh sách chat: $err'),
       ),
       data: (conversations) {
-        // Không có thread nào
+        // Không có thread nào → tự tạo 1 cuộc trò chuyện đầu tiên cho người dùng
         if (conversations.isEmpty && _selectedConversationId == null) {
-          return Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: cs.outlineVariant),
-                    ),
-                    padding: const EdgeInsets.all(12),
-                    child: const Center(
-                      child: Text('Chưa có cuộc trò chuyện nào'),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const SafeArea(top: false, child: SizedBox.shrink()),
-              ],
-            ),
-          );
-        }
+          if (!_autoCreatedFirstThread) {
+            // Gọi sau frame hiện tại để tránh setState trong build nhiều lần
+            _autoCreatedFirstThread = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _createNewConversation();
+              }
+            });
+          }
 
-        // Nếu chỉ có 1 thread và chưa chọn → auto mở
-        if (conversations.length == 1 && _selectedConversationId == null) {
-          final c = conversations.first;
-          return _ProPlanChat(
-            conversationId: c.id,
-            title: c.title,
-            initialAiMessage: null,
-            onBack: null,
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         // Nếu chưa chọn → show LIST

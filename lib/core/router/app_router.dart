@@ -79,8 +79,21 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/verification',
         name: AppRoute.verification.name,
         pageBuilder: (c, s) {
-          final email = s.extra is String ? s.extra as String : null;
-          return _fade(s, VerificationScreen(email: email));
+          String? email;
+          String? password;
+
+          final extra = s.extra;
+
+          if (extra is Map) {
+            // kỳ vọng: { 'email': String, 'password': String }
+            email = extra['email'] as String?;
+            password = extra['password'] as String?;
+          } else if (extra is String) {
+            // fallback cũ: chỉ có email
+            email = extra;
+          }
+
+          return _fade(s, VerificationScreen(email: email, password: password));
         },
       ),
 
@@ -103,6 +116,22 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // ===== Payment flow =====
+      //
+      // Lưu ý: deep link từ Stripe đang có dạng:
+      //   fitaiplanning://payment/result/success
+      // Flutter Router sẽ parse route mặc định thành `/result/success`
+      // (bỏ phần `payment` vì đó là host), nên ta cần 1 route
+      // `/result/:status` để tránh lỗi "no routes for location: /result/success".
+      // Route này chỉ việc redirect sang route chuẩn `/payment/result/:status`.
+      GoRoute(
+        path: '/result/:status',
+        redirect: (context, state) {
+          final status = state.pathParameters['status'];
+          if (status == null) return '/';
+          return '/payment/result/$status';
+        },
+      ),
+
       GoRoute(
         path: '/payment',
         pageBuilder: (c, s) => _fade(s, const SubscriptionsScreen()),

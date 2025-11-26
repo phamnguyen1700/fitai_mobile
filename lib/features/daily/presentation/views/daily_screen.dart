@@ -180,7 +180,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                                 // giả sử skeletalMuscleMass là gram → đổi sang kg
                                 smm: p.skeletalMuscleMass / 1000.0,
                                 // hiện đang dùng fatMassKg như % (API sẽ sửa sau)
-                                pbf: p.fatMassKg.toDouble(),
+                                pbf: p.fatPercent.toDouble(),
                               ),
                             )
                             .toList()

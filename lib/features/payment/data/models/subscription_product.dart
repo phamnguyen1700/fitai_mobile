@@ -1,6 +1,6 @@
 import 'package:json_annotation/json_annotation.dart';
 
-part 'subscription_product.g.dart'; // 🔥 dòng này PHẢI có
+part 'subscription_product.g.dart';
 
 enum BillingInterval {
   @JsonValue('day')
@@ -23,8 +23,12 @@ class SubscriptionProduct {
   final String currency;
   final BillingInterval interval;
   final bool isActive;
+
+  final bool isAdvisor; // ⭐ NEW FIELD thêm vào
+
   final DateTime? startDate;
   final DateTime? endDate;
+
   final String id;
   final DateTime? lastCreate;
   final DateTime? lastUpdate;
@@ -38,6 +42,9 @@ class SubscriptionProduct {
     required this.currency,
     required this.interval,
     required this.isActive,
+
+    required this.isAdvisor, // ⭐ Đưa vào constructor
+
     this.startDate,
     this.endDate,
     required this.id,
