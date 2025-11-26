@@ -1,17 +1,29 @@
 // lib/features/payment/presentation/views/checkout_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
+import 'package:fitai_mobile/features/payment/data/services/payment_service.dart';
+import 'package:fitai_mobile/features/payment/data/repositories/payment_repository.dart';
+
 import '../../../../core/widgets/app_bar.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../viewmodels/subscriptions_provider.dart';
 
-class CheckoutScreen extends ConsumerWidget {
+class CheckoutScreen extends ConsumerStatefulWidget {
   const CheckoutScreen({super.key});
   static const _imgPath = 'lib/core/assets/images';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  bool _isPaying = false;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(subscriptionsProvider);
     final plan = state.selectedProduct;
     final notifier = ref.read(subscriptionsProvider.notifier);
@@ -24,6 +36,7 @@ class CheckoutScreen extends ConsumerWidget {
     }
 
     final t = Theme.of(context).textTheme;
+    final messenger = ScaffoldMessenger.of(context);
 
     Widget rowKV(String k, String v, {Color? vColor, FontWeight? vWeight}) {
       return Row(
@@ -64,7 +77,7 @@ class CheckoutScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
 
-                  // Tóm tắt đơn
+                  // ==== Tóm tắt đơn ====
                   rowKV(
                     'Gói đã chọn',
                     plan.name,
@@ -77,7 +90,7 @@ class CheckoutScreen extends ConsumerWidget {
                     _money(plan.amount, plan.currency),
                     vColor: Colors.red,
                   ),
-                  rowKV('Ưu đãi', '0%'), // nếu chưa có discount, hiển thị 0%
+                  rowKV('Ưu đãi', '0%'),
                   const Divider(height: 28),
                   rowKV(
                     'Thành tiền',
@@ -87,6 +100,7 @@ class CheckoutScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 16),
 
+                  // ==== Phương thức thanh toán ====
                   Text(
                     'Phương thức thanh toán',
                     style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
@@ -95,56 +109,161 @@ class CheckoutScreen extends ConsumerWidget {
 
                   _methodTile(
                     context,
+                    title: 'Thanh toán bằng Stripe (thẻ quốc tế)',
+                    iconPath: '${CheckoutScreen._imgPath}/stripe.png',
+                    selected: state.selectedMethodId == 'stripe',
+                    onTap: () => notifier.selectMethod('stripe'),
+                  ),
+                  _methodTile(
+                    context,
                     title: 'Thanh toán bằng PayPal',
-                    iconPath: '$_imgPath/paypal.png',
+                    iconPath: '${CheckoutScreen._imgPath}/paypal.png',
                     selected: state.selectedMethodId == 'paypal',
                     onTap: () => notifier.selectMethod('paypal'),
                   ),
                   _methodTile(
                     context,
-                    title: 'Thanh toán bằng thẻ visa',
-                    iconPath: '$_imgPath/visa.png',
-                    selected: state.selectedMethodId == 'visa',
-                    onTap: () => notifier.selectMethod('visa'),
-                  ),
-                  _methodTile(
-                    context,
-                    title: 'Thanh toán bằng momo',
-                    iconPath: '$_imgPath/momo.png',
+                    title: 'Thanh toán bằng MoMo',
+                    iconPath: '${CheckoutScreen._imgPath}/momo.png',
                     selected: state.selectedMethodId == 'momo',
                     onTap: () => notifier.selectMethod('momo'),
                   ),
 
-                  if (state.selectedMethodId == 'visa') ...[
-                    const SizedBox(height: 8),
-                    _labeledInput(
-                      context,
-                      label: 'Số thẻ',
-                      hint: 'Nhập số thẻ',
-                      keyboard: TextInputType.number,
-                    ),
-                    const SizedBox(height: 10),
-                    _labeledInput(
-                      context,
-                      label: 'Tên chủ thẻ',
-                      hint: 'Nhập tên chủ thẻ',
-                    ),
-                    const SizedBox(height: 10),
-                    _labeledInput(
-                      context,
-                      label: 'Ngày hết hạn',
-                      hint: 'MM/YY',
-                      prefixIcon: Icons.calendar_month_rounded,
-                    ),
-                  ],
+                  const SizedBox(height: 16),
 
-                  const SizedBox(height: 8),
                   SizedBox(
                     height: 48,
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: () => context.push('/payment/processing'),
-                      child: const Text('Xác nhận thanh toán'),
+                      onPressed: _isPaying
+                          ? null
+                          : () async {
+                              // 1. Check method
+                              if (state.selectedMethodId == null) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Vui lòng chọn phương thức thanh toán.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (state.selectedMethodId != 'stripe') {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Phương thức này chưa được hỗ trợ.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              // 2. Đợi authNotifierProvider load xong
+                              AuthState authState;
+                              try {
+                                authState = await ref.read(
+                                  authNotifierProvider.future,
+                                );
+                              } catch (e) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Không lấy được thông tin đăng nhập. Vui lòng thử lại.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              if (!authState.isAuthenticated ||
+                                  authState.user == null) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Bạn cần đăng nhập trước khi thanh toán.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final user = authState.user!;
+
+                              setState(() => _isPaying = true);
+
+                              try {
+                                final repo = PaymentRepository(
+                                  PaymentService(),
+                                );
+
+                                // debug
+                                // ignore: avoid_print
+                                print(
+                                  '[Checkout] Creating payment for plan: ${plan.name}',
+                                );
+
+                                final resp = await repo.createPayment(
+                                  userId: user.id,
+                                  email: user.email,
+                                  name:
+                                      "${user.firstName ?? ''} ${user.lastName ?? ''}"
+                                          .trim(),
+                                  stripeCustomerId: "",
+                                  plan: plan,
+                                  successUrl:
+                                      "fitaiplanning://payment/result/success",
+                                  cancelUrl:
+                                      "fitaiplanning://payment/result/failed",
+                                );
+
+                                // debug
+                                // ignore: avoid_print
+                                print(
+                                  '[Checkout] sessionUrl = ${resp.sessionUrl}',
+                                );
+
+                                final uri = Uri.parse(resp.sessionUrl);
+
+                                if (!await canLaunchUrl(uri)) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Không mở được trang thanh toán Stripe.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } catch (e) {
+                                // ignore: avoid_print
+                                print('[Checkout] error: $e');
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Có lỗi khi tạo phiên thanh toán. Vui lòng thử lại.',
+                                    ),
+                                  ),
+                                );
+                              } finally {
+                                if (!mounted) return;
+                                setState(() => _isPaying = false);
+                              }
+                            },
+                      child: _isPaying
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Xác nhận thanh toán'),
                     ),
                   ),
                 ],
@@ -164,6 +283,7 @@ class CheckoutScreen extends ConsumerWidget {
     VoidCallback? onTap,
   }) {
     final cs = Theme.of(context).colorScheme;
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -217,51 +337,7 @@ class CheckoutScreen extends ConsumerWidget {
     );
   }
 
-  Widget _labeledInput(
-    BuildContext context, {
-    required String label,
-    String? hint,
-    IconData? prefixIcon,
-    TextInputType? keyboard,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(height: 6),
-        TextField(
-          keyboardType: keyboard,
-          decoration: InputDecoration(
-            hintText: hint,
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 12,
-            ),
-            filled: true,
-            fillColor: cs.surface,
-            prefixIcon: prefixIcon == null
-                ? null
-                : Icon(prefixIcon, size: 18, color: cs.onSurfaceVariant),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: cs.outline),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: cs.primary, width: 1.2),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _money(int amount, String currency) {
-    // Đơn giản: VND dùng dấu chấm, còn lại hiển thị "123 USD"
     if (currency.toUpperCase() == 'VND') {
       final vnd = amount.toString().replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'),

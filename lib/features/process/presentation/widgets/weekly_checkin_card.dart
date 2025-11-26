@@ -1,10 +1,11 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:fitai_mobile/features/camera/camera_level_guide_screen.dart';
 import '../../data/models/checkpoint_note_models.dart';
 import '../viewmodels/checkpoint_note_providers.dart';
+import 'package:fitai_mobile/features/process/presentation/viewmodels/bodygram_providers.dart';
 
 class WeeklyCheckInCard extends ConsumerStatefulWidget {
   final String title; // fallback nếu không có checkpointNumber
@@ -21,6 +22,9 @@ class WeeklyCheckInCard extends ConsumerStatefulWidget {
   /// Message trạng thái từ API
   final String? statusMessage;
 
+  /// 🆕 Callback khi lưu + upload + analyze xong
+  final VoidCallback? onCompleted;
+
   const WeeklyCheckInCard({
     super.key,
     this.title = 'Check-in định kì lần:',
@@ -30,6 +34,7 @@ class WeeklyCheckInCard extends ConsumerStatefulWidget {
     this.checkpointNumber,
     this.statusMessage,
     this.initialHeight,
+    this.onCompleted,
   });
 
   @override
@@ -44,9 +49,10 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
   bool _remindWeekly = false;
   bool _sendEmail = false;
 
-  // 🆕 path ảnh thực tế sau khi quét body
+  // path ảnh thực tế sau khi quét body
   String? _frontImagePath;
   String? _sideImagePath;
+  bool _isUploadingBodygram = false;
 
   @override
   void initState() {
@@ -105,7 +111,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     );
   }
 
-  Widget _buildWeightField(context) {
+  Widget _buildWeightField(BuildContext context) {
     return TextField(
       controller: _weightCtrl,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -117,7 +123,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     );
   }
 
-  Widget _buildHeightField(context) {
+  Widget _buildHeightField(BuildContext context) {
     return TextField(
       controller: _heightCtrl,
       readOnly: true,
@@ -151,11 +157,10 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     });
   }
 
-  /// 🆕 Gọi API lưu note + lời nhắc
   Future<void> _submitNote() async {
     final note = _noteCtrl.text.trim();
 
-    // tuỳ bạn: có thể bắt buộc note không rỗng hoặc 1 trong 2 checkbox phải bật
+    // 0) VALIDATE NOTE / REMINDER
     if (note.isEmpty && !_remindWeekly && !_sendEmail) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -165,6 +170,52 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
       return;
     }
 
+    // 1) VALIDATE CÂN NẶNG
+    final weightText = _weightCtrl.text.trim().replaceAll(',', '.');
+    if (weightText.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Hãy nhập cân nặng hiện tại trước khi lưu.'),
+        ),
+      );
+      return;
+    }
+
+    final double? weight = double.tryParse(weightText);
+    if (weight == null || weight <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cân nặng không hợp lệ.')));
+      return;
+    }
+
+    // 2) VALIDATE ẢNH BODYGRAM
+    final hasFront = _frontImagePath != null && _frontImagePath!.isNotEmpty;
+    final hasSide = _sideImagePath != null && _sideImagePath!.isNotEmpty;
+
+    if (!hasFront || !hasSide) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Hãy quét đủ 2 ảnh chính diện và bên hông trước khi lưu.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // 3) PARSE CHIỀU CAO
+    final heightText = _heightCtrl.text.trim().replaceAll(',', '.');
+    final double? height = double.tryParse(heightText);
+
+    if (height == null || height <= 0) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Chiều cao không hợp lệ.')));
+      return;
+    }
+
+    // 4) LƯU NOTE + LỜI NHẮC
     final req = CheckpointNoteRequest(
       remindWeekly: _remindWeekly,
       sendReportEmail: _sendEmail,
@@ -172,21 +223,60 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     );
 
     final controller = ref.read(checkpointNoteControllerProvider.notifier);
-
     final success = await controller.submitNote(req);
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Đã lưu Weekly Check-in')));
-      // tuỳ bạn: có muốn clear note không?
-      // _noteCtrl.clear();
-    } else {
+    if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lưu thất bại, vui lòng thử lại.')),
+        const SnackBar(
+          content: Text('Lưu ghi chú thất bại, vui lòng thử lại.'),
+        ),
       );
+      return;
+    }
+
+    // 5) NOTE OK → GỌI BODYGRAM
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã lưu Weekly Check-in, đang gửi Bodygram...'),
+      ),
+    );
+
+    setState(() => _isUploadingBodygram = true);
+
+    try {
+      final repo = ref.read(bodygramRepositoryProvider);
+
+      await repo.uploadFromWeeklyCheckin(
+        height: height,
+        weight: weight,
+        frontPhotoPath: _frontImagePath!,
+        sidePhotoPath: _sideImagePath!,
+      );
+
+      if (!mounted) return;
+
+      // Snackbar báo thành công
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi dữ liệu Bodygram để AI phân tích.'),
+        ),
+      );
+
+      // 🆕 báo cho màn ngoài biết là xong (để scroll / highlight overview)
+      widget.onCompleted?.call();
+    } catch (e, st) {
+      debugPrint('[WeeklyCheckIn] upload Bodygram ERROR: $e\n$st');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gửi dữ liệu Bodygram thất bại: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingBodygram = false);
+      }
     }
   }
 
@@ -198,24 +288,19 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     final p = widget.progress.clamp(0.0, 1.0);
     final percent = (p * 100).round();
 
-    // Nếu có checkpointNumber thì ghép vào sau title – VD: "Check-in định kì lần: 1"
     final titleText = widget.checkpointNumber != null
         ? '${widget.title} ${widget.checkpointNumber}'
         : widget.title;
 
-    // Text trạng thái: ưu tiên message từ API, fallback về "% hoàn thành"
     final statusText = widget.statusMessage ?? '$percent% Hoàn thành kế hoạch';
 
-    // responsive: màn hẹp → 2 hàng, màn rộng → 1 hàng
     final shortestSide = MediaQuery.of(context).size.shortestSide;
     final bool isNarrow = shortestSide < 360;
 
-    // 🆕 trạng thái ảnh
     final hasFront = _frontImagePath != null && _frontImagePath!.isNotEmpty;
     final hasSide = _sideImagePath != null && _sideImagePath!.isNotEmpty;
     final hasAny = hasFront || hasSide;
 
-    // 🆕 trạng thái saving từ controller
     final noteState = ref.watch(checkpointNoteControllerProvider);
     final isSaving = noteState.isLoading;
 
@@ -229,7 +314,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: title + calendar
+            // Header
             Row(
               children: [
                 Expanded(
@@ -248,7 +333,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
               ],
             ),
 
-            // Progress bar + status text
+            // Progress bar + status
             Container(
               height: 8,
               decoration: BoxDecoration(
@@ -290,7 +375,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
             _sectionTitle(context, 'Quét dữ liệu cơ thể'),
 
             if (!hasAny) ...[
-              // ----- CHƯA CÓ ẢNH → ảnh mẫu + hướng dẫn -----
+              // CHƯA CÓ ẢNH → ảnh mẫu
               SizedBox(
                 height: 180,
                 child: Row(
@@ -353,7 +438,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
               ),
               const SizedBox(height: 8),
             ] else ...[
-              // ----- ĐÃ CÓ ẢNH → hiển thị ảnh thật -----
+              // ĐÃ CÓ ẢNH → hiển thị ảnh thật
               SizedBox(
                 height: 180,
                 child: Row(
@@ -436,7 +521,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
               const SizedBox(height: 4),
             ],
 
-            // Hộp hướng dẫn (giữ chung cho cả 2 trạng thái)
+            // Hộp hướng dẫn
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
@@ -444,9 +529,9 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                 color: cs.surfaceContainerHighest.withOpacity(0.35),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Text(
                     'Hướng dẫn chụp:',
                     style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
@@ -540,8 +625,10 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
-                onPressed: isSaving ? null : _submitNote,
-                child: isSaving
+                onPressed: (isSaving || _isUploadingBodygram)
+                    ? null
+                    : _submitNote,
+                child: (isSaving || _isUploadingBodygram)
                     ? const SizedBox(
                         width: 18,
                         height: 18,

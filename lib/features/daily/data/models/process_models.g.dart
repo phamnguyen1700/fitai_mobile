@@ -71,7 +71,7 @@ ProgressLineChartPoint _$ProgressLineChartPointFromJson(
   measuredAt: DateTime.parse(json['measuredAt'] as String),
   weightKg: (json['weightKg'] as num).toDouble(),
   skeletalMuscleMass: (json['skeletalMuscleMass'] as num).toDouble(),
-  fatMassKg: (json['fatMassKg'] as num).toDouble(),
+  fatPercent: (json['fatPercentage'] as num).toDouble(),
   frontImageUrl: json['frontImageUrl'] as String?,
   rightImageUrl: json['rightImageUrl'] as String?,
 );
@@ -83,7 +83,7 @@ Map<String, dynamic> _$ProgressLineChartPointToJson(
   'measuredAt': instance.measuredAt.toIso8601String(),
   'weightKg': instance.weightKg,
   'skeletalMuscleMass': instance.skeletalMuscleMass,
-  'fatMassKg': instance.fatMassKg,
+  'fatPercentage': instance.fatPercent,
   'frontImageUrl': instance.frontImageUrl,
   'rightImageUrl': instance.rightImageUrl,
 };

@@ -7,8 +7,6 @@ part 'process_models.g.dart';
 /// 1. PREVIOUS CHECKPOINT COMPLETION %
 /// =======================
 
-/// Response tổng cho API:
-/// GET /api/checkpoints/previous/completion-percent
 @JsonSerializable()
 class PreviousCheckpointCompletionResponse {
   final CheckpointCompletionPercentData? data;
@@ -29,17 +27,13 @@ class PreviousCheckpointCompletionResponse {
       _$PreviousCheckpointCompletionResponseToJson(this);
 }
 
-/// Phần `data` bên trong previous completion percent
 @JsonSerializable()
 class CheckpointCompletionPercentData {
   /// % hoàn thành checkpoint trước (có thể null)
   final num? completionPercent;
-
   final int? checkpointNumber;
   final String? planId;
   final String? planName;
-
-  /// Message riêng cho data
   final String? message;
 
   CheckpointCompletionPercentData({
@@ -61,8 +55,6 @@ class CheckpointCompletionPercentData {
 /// 2. PROGRESS LINE CHART
 /// =======================
 
-/// Response cho API line chart:
-/// (ví dụ: GET /api/checkpoints/progress/line-chart)
 @JsonSerializable()
 class ProgressLineChartResponse {
   final List<ProgressLineChartPoint> data;
@@ -81,7 +73,6 @@ class ProgressLineChartResponse {
   Map<String, dynamic> toJson() => _$ProgressLineChartResponseToJson(this);
 }
 
-/// Một điểm dữ liệu trên line chart (một checkpoint)
 @JsonSerializable()
 class ProgressLineChartPoint {
   final int checkpointNumber;
@@ -92,11 +83,12 @@ class ProgressLineChartPoint {
   /// Cân nặng (kg)
   final double weightKg;
 
-  /// Skeletal Muscle Mass
+  /// Skeletal Muscle Mass (backend đang trả số, có thể là gram hay kg tuỳ logic server)
   final double skeletalMuscleMass;
 
-  /// Lượng mỡ (kg)
-  final double fatMassKg;
+  /// Thực chất là % mỡ cơ thể, backend trả về key `fatPercentage`
+  @JsonKey(name: 'fatPercentage')
+  final double fatPercent;
 
   /// Có thể null nếu chưa có ảnh
   final String? frontImageUrl;
@@ -107,7 +99,7 @@ class ProgressLineChartPoint {
     required this.measuredAt,
     required this.weightKg,
     required this.skeletalMuscleMass,
-    required this.fatMassKg,
+    required this.fatPercent,
     this.frontImageUrl,
     this.rightImageUrl,
   });
@@ -122,23 +114,6 @@ class ProgressLineChartPoint {
 /// 3. BODY COMPOSITION PIE CHART
 /// =======================
 
-/// Response cho API pie chart:
-/// ví dụ: GET /api/checkpoints/body-composition/pie
-///
-/// Sample:
-/// {
-///   "data": {
-///     "bodyFatPercent": 15,
-///     "skeletalMusclePercent": 47.19,
-///     "remainingPercent": 37.80,
-///     "fatLow": 10,
-///     "fatGood": 18,
-///     "fatHigh": 25,
-///     "muscleGood": 40
-///   },
-///   "success": true,
-///   "message": "Body composition data retrieved successfully"
-/// }
 @JsonSerializable()
 class BodyCompositionPieResponse {
   final BodyCompositionPieData? data;

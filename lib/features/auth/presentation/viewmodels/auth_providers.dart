@@ -4,13 +4,13 @@ import '../../data/models/user_model.dart';
 
 part 'auth_providers.g.dart';
 
-// Auth repository provider
+// ================== REPOSITORY PROVIDER ==================
 @riverpod
 AuthRepository authRepository(AuthRepositoryRef ref) {
   return AuthRepository();
 }
 
-// Auth state model
+// ================== AUTH STATE MODEL ==================
 class AuthState {
   final bool isAuthenticated;
   final UserModel? user;
@@ -44,7 +44,7 @@ class AuthState {
   }
 }
 
-// Auth notifier
+// ================== AUTH NOTIFIER ==================
 @riverpod
 class AuthNotifier extends _$AuthNotifier {
   @override
@@ -57,17 +57,15 @@ class AuthNotifier extends _$AuthNotifier {
     return AuthState(isAuthenticated: isAuthenticated, user: user);
   }
 
-  // Login method
+  // ------------------ LOGIN ------------------
   Future<void> login({
     required String email,
     required String password,
     bool rememberMe = false,
   }) async {
     // clear error + set loading
-    state = AsyncValue.data(
-      state.value?.copyWith(isLoading: true, error: null) ??
-          const AuthState(isLoading: true),
-    );
+    final current = state.value ?? const AuthState();
+    state = AsyncValue.data(current.copyWith(isLoading: true, error: null));
 
     try {
       final authRepository = ref.read(authRepositoryProvider);
@@ -78,6 +76,7 @@ class AuthNotifier extends _$AuthNotifier {
       );
 
       if (response.success) {
+        // LOGIN OK
         state = AsyncValue.data(
           AuthState(
             isAuthenticated: true,
@@ -87,22 +86,32 @@ class AuthNotifier extends _$AuthNotifier {
           ),
         );
       } else {
+        // LOGIN FAIL
         state = AsyncValue.data(
-          state.value!.copyWith(
+          AuthState(
+            isAuthenticated: false,
+            user: null,
             isLoading: false,
-            error: response.message ?? 'Email hoặc mật khẩu không chính xác.',
+            error: response.message,
           ),
         );
       }
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
+
+      // ❌ Lỗi exception cũng phải reset về chưa đăng nhập
       state = AsyncValue.data(
-        state.value!.copyWith(isLoading: false, error: msg),
+        AuthState(
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: msg,
+        ),
       );
     }
   }
 
-  // Register method
+  // ------------------ REGISTER ------------------
   Future<void> register({
     required String email,
     required String password,
@@ -110,9 +119,8 @@ class AuthNotifier extends _$AuthNotifier {
     String? firstName,
     String? lastName,
   }) async {
-    state = AsyncValue.data(
-      state.value!.copyWith(isLoading: true, error: null),
-    );
+    final current = state.value ?? const AuthState();
+    state = AsyncValue.data(current.copyWith(isLoading: true, error: null));
 
     try {
       final authRepository = ref.read(authRepositoryProvider);
@@ -125,40 +133,29 @@ class AuthNotifier extends _$AuthNotifier {
       );
 
       if (response.success) {
+        // Tuỳ BE: nếu register xong auto login thì để true,
+        // còn nếu đợi verify OTP mới cho login thì để false.
         state = AsyncValue.data(
           AuthState(
-            isAuthenticated: true,
+            isAuthenticated: false, // 👈 thường đợi verify OTP, nên để false
             user: response.userData,
             isLoading: false,
+            error: null,
           ),
         );
       } else {
         state = AsyncValue.data(
-          state.value!.copyWith(isLoading: false, error: response.message),
+          AuthState(
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: response.message ?? 'Đăng ký thất bại. Vui lòng thử lại.',
+          ),
         );
       }
     } catch (e) {
       state = AsyncValue.data(
-        state.value!.copyWith(isLoading: false, error: e.toString()),
-      );
-    }
-  }
-
-  // Logout method
-  Future<void> logout() async {
-    state = AsyncValue.data(state.value!.copyWith(isLoading: true));
-
-    try {
-      final authRepository = ref.read(authRepositoryProvider);
-      await authRepository.logout();
-
-      state = const AsyncValue.data(
-        AuthState(isAuthenticated: false, user: null, isLoading: false),
-      );
-    } catch (e) {
-      // Even if logout fails, clear local state
-      state = AsyncValue.data(
-        state.value!.copyWith(
+        AuthState(
           isAuthenticated: false,
           user: null,
           isLoading: false,
@@ -168,15 +165,34 @@ class AuthNotifier extends _$AuthNotifier {
     }
   }
 
-  // Verify OTP
-  Future<void> verifyOtp({
+  // ------------------ LOGOUT ------------------
+  Future<void> logout() async {
+    final current = state.value ?? const AuthState();
+    state = AsyncValue.data(current.copyWith(isLoading: true));
+
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+      await authRepository.logout();
+
+      state = const AsyncValue.data(
+        AuthState(isAuthenticated: false, user: null, isLoading: false),
+      );
+    } catch (e) {
+      // Dù logout fail (do server) vẫn clear local state
+      state = const AsyncValue.data(
+        AuthState(isAuthenticated: false, user: null, isLoading: false),
+      );
+    }
+  }
+
+  // ------------------ VERIFY OTP ------------------
+  /// Trả về true nếu verify thành công, false nếu thất bại
+  Future<bool> verifyOtp({
     required String email,
     required String otpCode,
   }) async {
-    state = AsyncValue.data(
-      state.value?.copyWith(isLoading: true, error: null) ??
-          const AuthState(isLoading: true),
-    );
+    final current = state.value ?? const AuthState();
+    state = AsyncValue.data(current.copyWith(isLoading: true, error: null));
 
     try {
       final authRepository = ref.read(authRepositoryProvider);
@@ -186,71 +202,57 @@ class AuthNotifier extends _$AuthNotifier {
       );
 
       if (response.success) {
+        // ✅ OTP đúng: chỉ clear loading + error, KHÔNG gán isAuthenticated ở đây
         state = AsyncValue.data(
-          state.value?.copyWith(
-                isAuthenticated: true,
-                user: response.userData,
-                isLoading: false,
-                error: null,
-              ) ??
-              AuthState(
-                isAuthenticated: true,
-                user: response.userData,
-                isLoading: false,
-              ),
+          current.copyWith(isLoading: false, error: null),
         );
+        return true;
       } else {
+        // ❌ OTP sai
         state = AsyncValue.data(
-          state.value!.copyWith(isLoading: false, error: response.message),
+          AuthState(
+            isAuthenticated: false,
+            user: null,
+            isLoading: false,
+            error: response.message ?? 'Mã OTP không hợp lệ.',
+          ),
         );
+        return false;
       }
     } catch (e) {
       state = AsyncValue.data(
-        state.value?.copyWith(isLoading: false, error: e.toString()) ??
-            AuthState(isLoading: false, error: e.toString()),
+        AuthState(
+          isAuthenticated: false,
+          user: null,
+          isLoading: false,
+          error: e.toString(),
+        ),
       );
+      return false;
     }
   }
 
-  // Làm mới profile từ API (dùng sau khi edit)
+  // ------------------ REFRESH PROFILE ------------------
   Future<void> refreshProfile() async {
     final authRepository = ref.read(authRepositoryProvider);
-
     final user = await authRepository.getCurrentUser();
+
+    final current = state.value ?? const AuthState();
     state = AsyncValue.data(
-      state.value?.copyWith(user: user) ??
-          AuthState(isAuthenticated: true, user: user),
+      current.copyWith(user: user, isAuthenticated: true),
     );
   }
 
-  // Clear error
+  // ------------------ CLEAR ERROR ------------------
   void clearError() {
-    if (state.value != null) {
-      state = AsyncValue.data(state.value!.copyWith(error: null));
+    final current = state.value;
+    if (current != null) {
+      state = AsyncValue.data(current.copyWith(error: null));
     }
   }
-
-  //   // Refresh token
-  //   Future<void> refreshToken() async {
-  //     try {
-  //       final authRepository = ref.read(authRepositoryProvider);
-  //       // await authRepository.refreshToken();
-
-  //       // Reload auth state
-  //       ref.invalidateSelf();
-  //     } catch (e) {
-  //       state = AsyncValue.data(
-  //         state.value!.copyWith(
-  //           isAuthenticated: false,
-  //           user: null,
-  //           error: e.toString(),
-  //         ),
-  //       );
-  //     }
-  //   }
 }
 
-// Convenience providers
+// ================== CONVENIENCE PROVIDERS ==================
 @riverpod
 bool isAuthenticated(IsAuthenticatedRef ref) {
   final authState = ref.watch(authNotifierProvider);

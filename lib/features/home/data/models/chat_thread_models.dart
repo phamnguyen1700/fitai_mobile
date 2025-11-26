@@ -541,12 +541,12 @@ class WorkoutPlanCoreData {
 @JsonSerializable(explicitToJson: true)
 class WorkoutPlanDay {
   final int dayNumber;
-  final String sessionName;
+  final String? sessionName; // <- cho phép null
   final List<WorkoutExercise> exercises;
 
   WorkoutPlanDay({
     required this.dayNumber,
-    required this.sessionName,
+    this.sessionName, // <- không required nữa
     required this.exercises,
   });
 
@@ -559,28 +559,192 @@ class WorkoutPlanDay {
 /// 1 bài tập trong ngày
 @JsonSerializable()
 class WorkoutExercise {
-  final String exerciseId;
+  final String? exerciseId; // <- nullable
   final String name;
   final int? sets;
   final int? reps;
   final int? durationMinutes;
-  final String category;
-  final String videoUrl;
-  final String note;
+  final String? category; // <- nullable
+  final String? videoUrl; // <- nullable
+  final String? note; // <- nullable (phòng khi backend bỏ trống)
 
   WorkoutExercise({
-    required this.exerciseId,
+    this.exerciseId,
     required this.name,
     this.sets,
     this.reps,
     this.durationMinutes,
-    required this.category,
-    required this.videoUrl,
-    required this.note,
+    this.category,
+    this.videoUrl,
+    this.note,
   });
 
   factory WorkoutExercise.fromJson(Map<String, dynamic> json) =>
       _$WorkoutExerciseFromJson(json);
 
   Map<String, dynamic> toJson() => _$WorkoutExerciseToJson(this);
+}
+
+/// =======================
+/// POST /api/aihealthplan/workout-plan/save-all
+/// =======================
+
+@JsonSerializable(explicitToJson: true)
+class WorkoutPlanSaveDayRequest {
+  final int dayNumber;
+  final String? sessionName; // <- cho nullable
+  final List<WorkoutExerciseSaveRequest> exercises;
+
+  WorkoutPlanSaveDayRequest({
+    required this.dayNumber,
+    this.sessionName, // <- không required nữa
+    required this.exercises,
+  });
+
+  factory WorkoutPlanSaveDayRequest.fromWorkoutPlanDay(WorkoutPlanDay day) {
+    return WorkoutPlanSaveDayRequest(
+      dayNumber: day.dayNumber,
+      sessionName: day.sessionName, // String? -> String? OK
+      exercises: day.exercises
+          .map(
+            (e) => WorkoutExerciseSaveRequest(
+              exerciseId: e.exerciseId,
+              name: e.name,
+              sets: e.sets,
+              reps: e.reps?.toString(),
+              durationMinutes: e.durationMinutes,
+              category: e.category,
+              videoUrl: e.videoUrl,
+              note: e.note,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  factory WorkoutPlanSaveDayRequest.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanSaveDayRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanSaveDayRequestToJson(this);
+}
+
+@JsonSerializable()
+class WorkoutExerciseSaveRequest {
+  final String? exerciseId; // <- cho phép null
+  final String name;
+  final int? sets;
+  final String? reps; // đã là nullable rồi
+  final int? durationMinutes;
+  final String? category; // <- cho phép null
+  final String? videoUrl; // <- cho phép null
+  final String? note; // <- cho phép null
+
+  WorkoutExerciseSaveRequest({
+    this.exerciseId,
+    required this.name,
+    this.sets,
+    this.reps,
+    this.durationMinutes,
+    this.category,
+    this.videoUrl,
+    this.note,
+  });
+
+  factory WorkoutExerciseSaveRequest.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutExerciseSaveRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutExerciseSaveRequestToJson(this);
+}
+
+/// Response:
+/// {
+///   "data": "Đã lưu 5 ngày workout details thành công",
+///   "success": true,
+///   "message": null
+/// }
+@JsonSerializable()
+class WorkoutPlanSaveAllResponse {
+  final String? data; // <- thêm, có thể null
+  final bool success;
+  final String? message; // <- cho phép null
+
+  WorkoutPlanSaveAllResponse({this.data, required this.success, this.message});
+
+  factory WorkoutPlanSaveAllResponse.fromJson(Map<String, dynamic> json) =>
+      _$WorkoutPlanSaveAllResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$WorkoutPlanSaveAllResponseToJson(this);
+}
+
+/// =======================
+/// POST /api/aihealthplan/meal-plan/save-batch
+/// Body: [ { dayNumber, meals: [ ... ] }, ... ]
+/// =======================
+
+@JsonSerializable(explicitToJson: true)
+class MealPlanSaveBatchDayRequest {
+  final int dayNumber;
+  final List<MealItem> meals;
+
+  MealPlanSaveBatchDayRequest({required this.dayNumber, required this.meals});
+
+  factory MealPlanSaveBatchDayRequest.fromDailyMealPlan(DailyMealPlan day) {
+    return MealPlanSaveBatchDayRequest(
+      dayNumber: day.dayNumber,
+      meals: day.meals,
+    );
+  }
+
+  factory MealPlanSaveBatchDayRequest.fromJson(Map<String, dynamic> json) =>
+      _$MealPlanSaveBatchDayRequestFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealPlanSaveBatchDayRequestToJson(this);
+}
+
+/// giả định response giống workout:
+/// {
+///   "data": "Đã lưu X ngày meal plan thành công",
+///   "success": true,
+///   "message": null
+/// }
+@JsonSerializable()
+class MealPlanSaveBatchResponse {
+  final String? data; // <- thêm
+  final bool success;
+  final String? message; // <- cho phép null
+
+  MealPlanSaveBatchResponse({this.data, required this.success, this.message});
+
+  factory MealPlanSaveBatchResponse.fromJson(Map<String, dynamic> json) =>
+      _$MealPlanSaveBatchResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$MealPlanSaveBatchResponseToJson(this);
+}
+
+/// =======================
+/// POST /api/aihealthplan/activate
+/// Customer: Activate plan and create first progress entry
+/// Response:
+/// {
+///   "data": "Đã kích hoạt plan và tạo progress đầu tiên",
+///   "success": true,
+///   "message": null
+/// }
+/// =======================
+@JsonSerializable()
+class AiHealthPlanActivateResponse {
+  final String data;
+  final bool success;
+  final String? message;
+
+  AiHealthPlanActivateResponse({
+    required this.data,
+    required this.success,
+    this.message,
+  });
+
+  factory AiHealthPlanActivateResponse.fromJson(Map<String, dynamic> json) =>
+      _$AiHealthPlanActivateResponseFromJson(json);
+
+  Map<String, dynamic> toJson() => _$AiHealthPlanActivateResponseToJson(this);
 }

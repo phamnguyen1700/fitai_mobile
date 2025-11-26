@@ -51,5 +51,16 @@
 		<string>Ứng dụng cần dùng camera để chụp ảnh.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Ứng dụng cần truy cập thư viện ảnh.</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+	<dict>
+		<key>CFBundleURLName</key>
+		<string>fitaiplanning</string>
+		<key>CFBundleURLSchemes</key>
+		<array>
+		<string>fitaiplanning</string>
+		</array>
+		</dict>
+		</array>
 	</dict>
 </plist>

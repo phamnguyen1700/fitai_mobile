@@ -118,4 +118,73 @@ class ChatThreadRepository {
     final resp = await generateWorkoutPlan();
     return resp.data.data.workoutPlan;
   }
+
+  // ==================== SAVE WORKOUT PLAN (SAVE-ALL) ====================
+
+  /// Gửi thẳng List<WorkoutPlanSaveDayRequest> xuống API
+  Future<WorkoutPlanSaveAllResponse> saveWorkoutPlanAll(
+    List<WorkoutPlanSaveDayRequest> days,
+  ) async {
+    try {
+      final res = await _service.saveWorkoutPlanAllRaw(days);
+      final body = WorkoutPlanSaveAllResponse.fromJson(
+        res.data as Map<String, dynamic>,
+      );
+      return body;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Helper: nhận List<WorkoutPlanDay> (từ generate) rồi convert sang payload save-all
+  Future<WorkoutPlanSaveAllResponse> saveWorkoutPlanAllFromGenerate(
+    List<WorkoutPlanDay> days,
+  ) {
+    final payload = days
+        .map((d) => WorkoutPlanSaveDayRequest.fromWorkoutPlanDay(d))
+        .toList();
+
+    return saveWorkoutPlanAll(payload);
+  }
+
+  // ==================== SAVE MEAL PLAN (SAVE-BATCH) ====================
+
+  /// Gửi thẳng List<MealPlanSaveBatchDayRequest> xuống API
+  Future<MealPlanSaveBatchResponse> saveMealPlanBatch(
+    List<MealPlanSaveBatchDayRequest> days,
+  ) async {
+    try {
+      final res = await _service.saveMealPlanBatchRaw(days);
+      final body = MealPlanSaveBatchResponse.fromJson(
+        res.data as Map<String, dynamic>,
+      );
+      return body;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Helper: nhận List<DailyMealPlan> (từ generate) rồi convert sang payload save-batch
+  Future<MealPlanSaveBatchResponse> saveMealPlanBatchFromGenerate(
+    List<DailyMealPlan> days,
+  ) {
+    final payload = days
+        .map((d) => MealPlanSaveBatchDayRequest.fromDailyMealPlan(d))
+        .toList();
+
+    return saveMealPlanBatch(payload);
+  }
+  // ==================== ACTIVATE AI HEALTH PLAN ====================
+
+  Future<AiHealthPlanActivateResponse> activateAiHealthPlan() async {
+    try {
+      final res = await _service.activateAiHealthPlanRaw();
+      final body = AiHealthPlanActivateResponse.fromJson(
+        res.data as Map<String, dynamic>,
+      );
+      return body;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }
