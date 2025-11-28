@@ -93,6 +93,34 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   final _passCtl = TextEditingController();
   bool _rememberMe = false;
 
+  /// Chuyển đổi error message từ API sang tiếng Việt
+  String _translateError(String error) {
+    final lowerError = error.toLowerCase();
+
+    if (lowerError.contains('invalid email or password') ||
+        lowerError.contains('invalid email') ||
+        lowerError.contains('invalid password')) {
+      return 'Email hoặc mật khẩu không đúng. Vui lòng kiểm tra lại.';
+    }
+
+    if (lowerError.contains('email is not verified') ||
+        lowerError.contains('email chưa được xác thực')) {
+      return 'Email chưa được xác thực. Vui lòng xác thực email trước khi đăng nhập.';
+    }
+
+    if (lowerError.contains('user not found')) {
+      return 'Không tìm thấy tài khoản với email này.';
+    }
+
+    if (lowerError.contains('account locked') ||
+        lowerError.contains('account disabled')) {
+      return 'Tài khoản đã bị khóa. Vui lòng liên hệ hỗ trợ.';
+    }
+
+    // Nếu đã là tiếng Việt hoặc không match, trả về nguyên bản
+    return error;
+  }
+
   String? _loginPasswordValidator(String? value) {
     if (value == null || value.isEmpty) {
       return 'Vui lòng nhập mật khẩu';
@@ -113,22 +141,19 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // Gọi login qua notifier
+    final email = _emailCtl.text.trim();
+    final password = _passCtl.text;
+
+    // Gọi login
     await ref
         .read(authNotifierProvider.notifier)
-        .login(
-          email: _emailCtl.text.trim(),
-          password: _passCtl.text,
-          rememberMe: _rememberMe,
-        );
+        .login(email: email, password: password, rememberMe: _rememberMe);
 
-    // Lấy state sau khi login
     final asyncAuth = ref.read(authNotifierProvider);
     final authState = asyncAuth.value; // AuthState? hoặc null
 
     if (!mounted) return;
 
-    // Nếu vì lý do gì đó state chưa có value
     if (authState == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Có lỗi xảy ra. Vui lòng thử lại.')),
@@ -136,21 +161,58 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
       return;
     }
 
-    // ❌ LOGIN FAIL → KHÔNG ĐIỀU HƯỚNG
+    // ❌ LOGIN FAIL
     if (!authState.isAuthenticated) {
-      final msg =
+      final rawErr =
           authState.error ??
           'Đăng nhập thất bại. Vui lòng kiểm tra email/mật khẩu.';
+
+      // Map error message từ API sang tiếng Việt
+      String err = _translateError(rawErr);
+
+      // 🔥 CASE: Email chưa verify
+      if (err.contains('Email is not verified') ||
+          err.contains('chưa được xác thực')) {
+        // Gửi lại OTP trước
+        final resp = await ref
+            .read(authNotifierProvider.notifier)
+            .resendOtp(email: email);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                resp.success
+                    ? 'Tài khoản chưa được xác thực. Đã gửi lại mã OTP, vui lòng kiểm tra email.'
+                    : 'Tài khoản chưa được xác thực. Không gửi được mã OTP, thử lại sau.',
+              ),
+              backgroundColor: resp.success ? Colors.orange : Colors.red,
+            ),
+          );
+
+          // Đóng bottom sheet
+          Navigator.of(context).pop();
+
+          // Điều hướng sang màn xác thực, truyền email + password
+          context.goNamed(
+            AppRoute.verification.name,
+            extra: {'email': email, 'password': password},
+          );
+        }
+        return;
+      }
+
+      // Các lỗi login khác: hiển thị message tiếng Việt
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(msg),
+          content: Text(err),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
     }
 
-    // ✅ LOGIN OK → ĐIỀU HƯỚNG
+    // ✅ LOGIN OK – như code cũ
     final step = authState.user?.onboardingStep;
 
     String target;
@@ -171,10 +233,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         break;
     }
 
-    // Đóng bottom sheet nếu đang mở
     Navigator.of(context).pop();
-
-    // Điều hướng đến màn tương ứng
     context.go(target);
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -254,7 +313,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8.0),
               child: Text(
-                errorText,
+                _translateError(errorText),
                 style: TextStyle(color: cs.error, fontSize: 13),
               ),
             ),

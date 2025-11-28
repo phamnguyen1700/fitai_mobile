@@ -12,7 +12,7 @@ SubscriptionProduct _$SubscriptionProductFromJson(Map<String, dynamic> json) =>
       priceId: json['priceId'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
-      amount: (json['amount'] as num).toInt(),
+      amount: (json['amount'] as num).toDouble(),
       currency: json['currency'] as String,
       interval: $enumDecode(_$BillingIntervalEnumMap, json['interval']),
       isActive: json['isActive'] as bool,

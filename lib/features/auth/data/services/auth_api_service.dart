@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:fitai_mobile/features/auth/data/models/change_password_request.dart';
+import 'package:fitai_mobile/features/auth/data/models/subscription_current_response.dart';
 import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_constants.dart';
@@ -98,20 +100,58 @@ class AuthApiService {
         throw Exception('OTP verification failed: Invalid response');
       }
     } on DioException catch (e) {
-      if (e.response?.data != null) {
-        try {
-          final errorResponse = AuthResponse.fromJson(e.response!.data);
-          throw Exception('OTP verification failed: ${errorResponse.message}');
-        } catch (_) {
-          throw Exception(
-            'OTP verification failed: ${e.response?.data['message'] ?? e.message}',
-          );
-        }
-      } else {
-        throw Exception('OTP verification failed: ${e.message}');
+      final data = e.response?.data;
+
+      if (data is Map<String, dynamic>) {
+        final message = (data['message'] ?? 'Mã OTP không hợp lệ.').toString();
+        return AuthResponse(success: false, message: message);
       }
+
+      final fallback = e.message ?? 'Không thể xác thực OTP, vui lòng thử lại.';
+      return AuthResponse(success: false, message: fallback);
     } catch (e) {
-      throw Exception('OTP verification failed: $e');
+      return AuthResponse(
+        success: false,
+        message: 'OTP verification failed: $e',
+      );
+    }
+  }
+
+  Future<AuthResponse> resendOtp({required String email}) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiConstants.resendOtp,
+        data: {'email': email},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final body = response.data!;
+        final success = body['success'] as bool? ?? false;
+        final message = (body['message'] ?? 'Không thể gửi lại mã OTP.')
+            .toString();
+        return AuthResponse(success: success, message: message);
+      }
+
+      return const AuthResponse(
+        success: false,
+        message: 'Không thể gửi lại mã OTP. Vui lòng thử lại.',
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map<String, dynamic>) {
+        final message = (data['message'] ?? 'Không thể gửi lại mã OTP.')
+            .toString();
+        return AuthResponse(success: false, message: message);
+      }
+      return AuthResponse(
+        success: false,
+        message: e.message ?? 'Không thể gửi lại mã OTP.',
+      );
+    } catch (e) {
+      return AuthResponse(
+        success: false,
+        message: 'Không thể gửi lại mã OTP: $e',
+      );
     }
   }
 
@@ -304,6 +344,71 @@ class AuthApiService {
       }
     } catch (e) {
       throw Exception('Get profile failed: $e');
+    }
+  }
+
+  Future<AuthResponse> changePassword(ChangePasswordRequest request) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        ApiConstants.changePassword,
+        data: request.toJson(),
+      );
+
+      final body = response.data;
+
+      if (body != null) {
+        final success = body['success'] == true;
+        final message = (body['message'] ?? '').toString();
+
+        return AuthResponse(success: success, message: message);
+      }
+
+      throw Exception('Change password failed: Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      if (data is Map<String, dynamic>) {
+        final success = data['success'] == true;
+        final message = (data['message'] ?? '').toString();
+
+        return AuthResponse(success: success, message: message);
+      }
+      rethrow;
+    }
+  }
+
+  /// Lấy gói subscription hiện tại của user
+  Future<SubscriptionCurrentResponse> getCurrentUserSubscription(
+    String userId,
+  ) async {
+    try {
+      // Gợi ý ApiConstants – bạn thêm vào file ApiConstants:
+      // static String currentUserSubscription(String userId)
+      //   => '/api/subscription/user/$userId/current';
+
+      final response = await _apiClient.get<Map<String, dynamic>>(
+        ApiConstants.currentUserSubscription(userId),
+      );
+
+      final body = response.data;
+      if (body != null) {
+        // Backend trả dạng: { success: true/false, message?, data: {...}|null }
+        return SubscriptionCurrentResponse.fromJson(body);
+      }
+
+      throw Exception('Get current subscription failed: Invalid response');
+    } on DioException catch (e) {
+      final data = e.response?.data;
+
+      // Nếu server vẫn trả JSON (success=false, message='...', data=null)
+      if (data is Map<String, dynamic>) {
+        return SubscriptionCurrentResponse.fromJson(data);
+      }
+
+      // Lỗi mạng / không có response -> cho bubble lên cho Repository xử lý
+      rethrow;
+    } catch (e) {
+      // Trường hợp lỗi bất ngờ khác – gói lại cho dễ debug
+      throw Exception('Get current subscription failed: $e');
     }
   }
 }

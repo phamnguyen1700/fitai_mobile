@@ -1,7 +1,8 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:fitai_mobile/core/status/bodygram_error.dart';
 import 'package:fitai_mobile/features/camera/camera_level_guide_screen.dart';
 import '../../data/models/checkpoint_note_models.dart';
 import '../viewmodels/checkpoint_note_providers.dart';
@@ -53,6 +54,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
   String? _frontImagePath;
   String? _sideImagePath;
   bool _isUploadingBodygram = false;
+  String? _bodygramError;
 
   @override
   void initState() {
@@ -79,6 +81,13 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     _heightCtrl.dispose();
     _noteCtrl.dispose();
     super.dispose();
+  }
+
+  String _bodygramErrorMessage(Object error) {
+    if (error is BodygramAnalyzeException) {
+      return error.status.explanation;
+    }
+    return 'Gửi dữ liệu Bodygram thất bại, vui lòng thử lại.';
   }
 
   Widget _sectionTitle(BuildContext context, String text) {
@@ -154,11 +163,39 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     setState(() {
       _frontImagePath = front;
       _sideImagePath = side;
+      _bodygramError = null;
     });
+  }
+
+  /// =======================
+  /// Loading Section
+  /// =======================
+  Widget _buildLoadingSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    final loadingText = _isUploadingBodygram
+        ? "Đang gửi dữ liệu Bodygram để AI phân tích..."
+        : "Đang lưu cập nhật...";
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Text(loadingText, style: t.bodyMedium?.copyWith(color: cs.primary)),
+        const SizedBox(height: 10),
+        LinearProgressIndicator(
+          backgroundColor: cs.primary.withOpacity(0.15),
+          valueColor: AlwaysStoppedAnimation(cs.primary),
+          minHeight: 4,
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
   }
 
   Future<void> _submitNote() async {
     final note = _noteCtrl.text.trim();
+    setState(() => _bodygramError = null);
 
     // 0) VALIDATE NOTE / REMINDER
     if (note.isEmpty && !_remindWeekly && !_sendEmail) {
@@ -257,6 +294,8 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
 
       if (!mounted) return;
 
+      setState(() => _bodygramError = null);
+
       // Snackbar báo thành công
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -270,9 +309,12 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
       debugPrint('[WeeklyCheckIn] upload Bodygram ERROR: $e\n$st');
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gửi dữ liệu Bodygram thất bại: $e')),
-      );
+      final message = _bodygramErrorMessage(e);
+      setState(() {
+        _bodygramError = message;
+        _frontImagePath = null;
+        _sideImagePath = null;
+      });
     } finally {
       if (mounted) {
         setState(() => _isUploadingBodygram = false);
@@ -304,7 +346,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
     final noteState = ref.watch(checkpointNoteControllerProvider);
     final isSaving = noteState.isLoading;
 
-    return Card(
+    final card = Card(
       elevation: 0,
       color: cs.surface,
       surfaceTintColor: Colors.transparent,
@@ -394,7 +436,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Chính diện',
+                            'Trực diện',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -417,7 +459,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Bên hông',
+                            'Mặt cạnh (R)',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -506,7 +548,7 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                           ),
                           const SizedBox(height: 4),
                           const Text(
-                            'Bên hông (đã quét)',
+                            'Mặt cạnh (đã quét)',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -558,6 +600,16 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                 ),
               ),
             ),
+            if (_bodygramError != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _bodygramError!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
 
             // ========= Lời nhắc =========
             _sectionTitle(context, 'Lời nhắc'),
@@ -621,25 +673,31 @@ class _WeeklyCheckInCardState extends ConsumerState<WeeklyCheckInCard> {
                 ),
               ),
             ),
-
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton(
-                onPressed: (isSaving || _isUploadingBodygram)
-                    ? null
-                    : _submitNote,
-                child: (isSaving || _isUploadingBodygram)
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Lưu cập nhật'),
-              ),
-            ),
           ],
         ),
       ),
+    );
+
+    final isLoading = isSaving || _isUploadingBodygram;
+
+    return Column(
+      children: [
+        card,
+        const SizedBox(height: 16),
+        if (isLoading)
+          _buildLoadingSection(context)
+        else
+          SizedBox(
+            width: double.infinity,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton(
+                onPressed: _submitNote,
+                child: const Text('Lưu cập nhật'),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

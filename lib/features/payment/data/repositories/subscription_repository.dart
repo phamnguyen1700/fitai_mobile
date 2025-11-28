@@ -13,13 +13,28 @@ class SubscriptionRepository {
       final res = await _service.getActiveProductsRaw();
 
       if (res.statusCode == 200 && res.data != null) {
-        return SubscriptionProduct.listFromJson(res.data);
+        final data = res.data;
+
+        // Case 1: backend trả về mảng trực tiếp (đúng với log hiện tại)
+        if (data is List) {
+          return SubscriptionProduct.listFromJson(data);
+        }
+
+        // Case 2: đề phòng sau này backend bọc thêm { data: [...] }
+        if (data is Map<String, dynamic> && data['data'] is List) {
+          return SubscriptionProduct.listFromJson(data['data']);
+        }
+
+        throw Exception(
+          'Định dạng dữ liệu không hợp lệ từ /subscription/active-products.',
+        );
       }
+
       throw Exception('Không lấy được danh sách gói, vui lòng thử lại sau.');
     } on DioException catch (e) {
       final serverMsg = _extractServerMessage(e);
       throw Exception(serverMsg ?? 'Đã xảy ra lỗi, vui lòng thử lại sau.');
-    } catch (_) {
+    } catch (e) {
       throw Exception('Đã xảy ra lỗi, vui lòng thử lại sau.');
     }
   }

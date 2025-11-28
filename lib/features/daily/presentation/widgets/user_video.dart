@@ -13,12 +13,16 @@ class UserExerciseVideoSection extends StatefulWidget {
 
   /// Video log từ server (exercise.videoLogUrl)
   final String? existingVideoUrl;
+  final bool isCompleted;
+  final int? completionPercent;
 
   const UserExerciseVideoSection({
     super.key,
     required this.title,
     this.localVideoPath,
     this.existingVideoUrl,
+    this.isCompleted = false,
+    this.completionPercent,
   });
 
   @override
@@ -76,15 +80,40 @@ class _UserExerciseVideoSectionState extends State<UserExerciseVideoSection> {
 
     if (src == null) return const SizedBox.shrink();
 
+    final percentLabel = widget.completionPercent?.round();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Video bài tập của bạn',
-          style: t.bodySmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Video bài tập của bạn',
+                style: t.bodySmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurface,
+                ),
+              ),
+            ),
+            if (percentLabel != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: cs.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$percentLabel%',
+                  style: t.labelSmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else if (widget.isCompleted)
+              Icon(Icons.check_circle, color: cs.primary, size: 18),
+          ],
         ),
         const SizedBox(height: 6),
 

@@ -10,7 +10,9 @@ part 'payment_controller.g.dart';
 @riverpod
 class PaymentController extends _$PaymentController {
   @override
-  Future<void> build() async {}
+  Future<void> build() async {
+    // Không cần làm gì lúc init, chỉ để có AsyncNotifier<void>
+  }
 
   Future<PaymentCreateResponse?> createPaymentSession(
     SubscriptionProduct plan,
@@ -31,10 +33,11 @@ class PaymentController extends _$PaymentController {
       print('[PaymentController] creating payment for plan: ${plan.name}');
 
       final result = await repo.createPayment(
-        userId: user.id, // nếu id nullable
-        email: user.email, // tránh null
+        userId: user.id, // nếu id nullable thì sửa trong model User
+        email: user.email,
         name: "${user.firstName ?? ''} ${user.lastName ?? ''}".trim(),
-        stripeCustomerId: "", // cho null nếu chưa có
+        // KHÔNG nên truyền "" – null là đúng với PaymentCreateRequest
+        stripeCustomerId: null,
         plan: plan,
         successUrl: "fitaiplanning://payment/result/success",
         cancelUrl: "fitaiplanning://payment/result/failed",
@@ -44,7 +47,8 @@ class PaymentController extends _$PaymentController {
       // ignore: avoid_print
       print('[PaymentController] sessionUrl = ${result.sessionUrl}');
 
-      state = const AsyncValue.data(true);
+      // build() là Future<void> nên state là AsyncValue<void> → data(null)
+      state = const AsyncValue.data(null);
       return result;
     } catch (e, st) {
       // ignore: avoid_print

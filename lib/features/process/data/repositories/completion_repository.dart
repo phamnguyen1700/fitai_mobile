@@ -1,5 +1,6 @@
-import 'package:fitai_mobile/features/process/data/models/completion_models.dart';
+import 'package:dio/dio.dart';
 import 'package:fitai_mobile/features/process/data/services/completion_service.dart';
+import 'package:fitai_mobile/features/process/data/models/completion_result.dart';
 
 class CompletionRepository {
   final CompletionService _service;
@@ -7,27 +8,24 @@ class CompletionRepository {
   CompletionRepository({CompletionService? service})
     : _service = service ?? CompletionService();
 
-  /// Lấy full response (nếu cần meta / message)
-  Future<CompletionPercentResponse> getPreviousCheckpointCompletion() {
-    return _service.getPreviousCheckpointCompletion();
-  }
+  /// Trả về CompletionResult thay vì chỉ model
+  Future<CompletionResult> getPreviousCompletion() async {
+    try {
+      final res = await _service.getPreviousCheckpointCompletion();
+      final data = res.data;
 
-  /// Lấy riêng phần `data`
-  Future<CompletionPercentData?> getPreviousCompletionData() {
-    return _service.getPreviousCompletionData();
-  }
+      final msg = data?.message?.toLowerCase() ?? '';
 
-  /// Helper cho UI: trả về progress 0.0–1.0
-  ///
-  /// - Nếu completionPercent null => trả về 0.0
-  /// - Nếu >100 hoặc <0 => clamp trong [0, 100] cho chắc
-  Future<double> getPreviousCompletionProgress() async {
-    final data = await _service.getPreviousCompletionData();
-    final percent = data?.completionPercent;
+      if (msg.contains('không tìm thấy plan active') ||
+          msg.contains('no active')) {
+        return CompletionResult.noPlan(data);
+      }
 
-    if (percent == null) return 0.0;
-
-    final clamped = percent.clamp(0, 100);
-    return clamped / 100.0;
+      return CompletionResult.hasPlan(data!);
+    } on DioException {
+      return CompletionResult.error();
+    } catch (_) {
+      return CompletionResult.error();
+    }
   }
 }

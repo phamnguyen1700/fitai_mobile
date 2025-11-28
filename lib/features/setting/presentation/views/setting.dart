@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/section_card.dart';
 import '../widgets/setting_tab_menu.dart';
 import '../widgets/language_dropdown.dart';
@@ -13,14 +14,30 @@ import 'package:intl/intl.dart';
 
 enum SettingTab { general, profile, notifications }
 
-class SettingScreen extends StatefulWidget {
+class SettingScreen extends ConsumerStatefulWidget {
   const SettingScreen({super.key});
   @override
-  State<SettingScreen> createState() => _SettingScreenState();
+  ConsumerState<SettingScreen> createState() => _SettingScreenState();
 }
 
-class _SettingScreenState extends State<SettingScreen> {
+class _SettingScreenState extends ConsumerState<SettingScreen> {
   SettingTab _tab = SettingTab.general;
+  bool _isLoggingOut = false;
+
+  Future<void> _handleLogout() async {
+    setState(() => _isLoggingOut = true);
+    final notifier = ref.read(authNotifierProvider.notifier);
+
+    await notifier.logout();
+
+    if (!mounted) return;
+    setState(() => _isLoggingOut = false);
+
+    if (Navigator.canPop(context)) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+    context.go('/welcome');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +64,18 @@ class _SettingScreenState extends State<SettingScreen> {
             SettingTab.profile => const _ProfileTab(),
             SettingTab.notifications => const _NotificationsTab(),
           },
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: _isLoggingOut ? null : _handleLogout,
+            icon: _isLoggingOut
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.logout_rounded),
+            label: Text(_isLoggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'),
+          ),
         ],
       ),
     );
@@ -143,10 +172,7 @@ class _ProfileTab extends ConsumerWidget {
             const SizedBox(height: 12),
             SectionCard(
               title: 'Mật khẩu và bảo mật',
-              child: SecurityCard(
-                email: user.email,
-                maskedPassword: '**********',
-              ),
+              child: SecurityCard(maskedPassword: '**********'),
             ),
           ],
         );

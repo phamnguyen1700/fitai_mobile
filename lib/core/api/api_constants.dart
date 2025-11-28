@@ -12,6 +12,7 @@ class ApiConstants {
   static const String login = '/auth/login';
   static const String register = '/auth/register';
   static const String verifyOtp = '/auth/verify-otp';
+  static const String resendOtp = '/auth/resend-otp';
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout';
   static const String forgotPassword = '/auth/forgot-password';
@@ -26,7 +27,7 @@ class ApiConstants {
   // User endpoints
   static const String profile = '/user/profile';
   static const String updateProfile = '/user/profile';
-  static const String changePassword = '/user/change-password'; // Headers
+  static const String changePassword = '/auth/change-password';
   static const String fullProfile = '/user/full-profile';
   static const String currentUser = '/user/me';
 
@@ -78,4 +79,6 @@ class ApiConstants {
   static const String paymentCreate = '/payment/create';
   static const String advisorList = '/advisor';
   static const String advisorAssign = '/advisor/assign-advisor';
+  static String currentUserSubscription(String userId) =>
+      '/subscription/user/$userId/current';
 }

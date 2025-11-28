@@ -229,12 +229,17 @@ class _ProfileInfoCardState extends State<ProfileInfoCard> {
           value: _selectedGoal,
           decoration: const InputDecoration(labelText: 'Mục tiêu'),
           items: const [
-            DropdownMenuItem(value: Goal.Weight_Loss, child: Text('Giảm cân')),
-            DropdownMenuItem(value: Goal.Weight_Gain, child: Text('Tăng cân')),
-            DropdownMenuItem(value: Goal.Build_Muscle, child: Text('Tăng cơ')),
             DropdownMenuItem(
-              value: Goal.Maintain_Weight,
-              child: Text('Duy trì cân nặng'),
+              value: Goal.Weight_Loss,
+              child: Text('Giảm cân / Giảm mỡ'),
+            ),
+            DropdownMenuItem(
+              value: Goal.Weight_Gain,
+              child: Text('Tăng cân / Tăng cơ'),
+            ),
+            DropdownMenuItem(
+              value: Goal.Maintenance,
+              child: Text('Duy trì cân nặng / Giảm mỡ'),
             ),
           ],
           onChanged: _onGoalChanged,

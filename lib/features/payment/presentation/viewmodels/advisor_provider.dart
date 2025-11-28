@@ -6,15 +6,33 @@ import '../../data/models/advisor_model.dart';
 
 part 'advisor_provider.g.dart';
 
-/// Provider cho AdvisorRepository – dùng ở controller / UI
+/// Provider cho AdvisorService
 @riverpod
-AdvisorRepository advisorRepository(AdvisorRepositoryRef ref) {
-  return AdvisorRepository(AdvisorService());
+AdvisorService advisorService(AdvisorServiceRef ref) {
+  return AdvisorService();
 }
 
-/// Provider load danh sách advisor (Future) – dùng trực tiếp ở UI nếu muốn
+/// Provider cho AdvisorRepository – dùng để gán advisor, v.v.
+@riverpod
+AdvisorRepository advisorRepository(AdvisorRepositoryRef ref) {
+  final service = ref.watch(advisorServiceProvider);
+  return AdvisorRepository(service);
+}
+
+/// Provider load danh sách advisor (Future) – dùng ở UI
 @riverpod
 Future<List<AdvisorModel>> advisors(AdvisorsRef ref) async {
-  final repo = ref.read(advisorRepositoryProvider);
-  return repo.getAdvisors();
+  final repo = ref.watch(advisorRepositoryProvider);
+
+  try {
+    return await repo.getAdvisors();
+  } catch (e, stack) {
+    // Log debug nếu cần
+    // ignore: avoid_print
+    print('⚠️ Error loading advisors: $e');
+    // ignore: avoid_print
+    print(stack);
+
+    throw Exception("Không thể tải danh sách advisor.");
+  }
 }

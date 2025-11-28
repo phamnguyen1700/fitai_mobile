@@ -24,23 +24,31 @@ class PaymentResultScreen extends ConsumerStatefulWidget {
 class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
   AdvisorModel? _selectedAdvisor;
 
+  Future<void> _handleGoHome() async {
+    if (widget.success) {
+      // 1. Refresh profile user (gọi lại /me hoặc tương đương)
+      await ref.read(authNotifierProvider.notifier).refreshProfile();
+
+      // 2. Refresh lại subscription hiện tại (gói đã được kích hoạt sau payment)
+      await ref.read(subscriptionNotifierProvider.notifier).refresh();
+    }
+
+    if (!mounted) return;
+    context.go('/home');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-
-    // ⭐ Lấy subscription state để biết gói hiện tại
     final subsState = ref.watch(subscriptionsProvider);
-
-    // Lấy user hiện tại để dùng userId khi assign advisor
     final user = ref.watch(currentUserProvider);
 
-    // Load advisors từ API
-    final advisorsAsync = ref.watch(advisorsProvider);
-
-    // ⭐ Chỉ cho chọn advisor nếu:
-    // - Thanh toán thành công
-    // - Và gói đã mua có isAdvisor = true
     final bool canChooseAdvisor =
         widget.success && (subsState.selectedProduct?.isAdvisor ?? false);
 
@@ -75,7 +83,6 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Ảnh biểu tượng
                 Image.asset(
                   widget.success
                       ? "lib/core/assets/images/success.png"
@@ -86,228 +93,244 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
 
                 const SizedBox(height: 24),
 
-                // ===========================
-                //  SELECT ADVISOR (nếu gói có advisor)
-                // ===========================
+                /// ==========================
+                ///  Chọn advisor (nếu có quyền)
+                /// ==========================
                 if (canChooseAdvisor)
-                  advisorsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(),
-                    ),
-                    error: (err, st) =>
-                        Text("Không tải được danh sách advisor"),
-                    data: (advisors) {
-                      if (advisors.isEmpty) {
-                        return Text(
-                          "Hiện chưa có advisor khả dụng.",
-                          style: t.bodyMedium,
-                        );
-                      }
+                  Builder(
+                    builder: (ctx) {
+                      final advisorsAsync = ref.watch(advisorsProvider);
 
-                      return Column(
-                        children: [
-                          Text(
-                            "Hãy chọn người đồng hành phù hợp:",
-                            textAlign: TextAlign.center,
-                            style: t.bodyMedium,
-                          ),
-                          const SizedBox(height: 12),
+                      return advisorsAsync.when(
+                        loading: () => const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: CircularProgressIndicator(),
+                        ),
+                        error: (err, st) {
+                          // Log thêm cho dễ debug
+                          // ignore: avoid_print
+                          print('❌ Load advisors error: $err');
+                          // ignore: avoid_print
+                          print(st);
+                          return Text("Không tải được danh sách advisor");
+                        },
+                        data: (advisors) {
+                          if (advisors.isEmpty) {
+                            return Text(
+                              "Hiện chưa có advisor khả dụng.",
+                              style: t.bodyMedium,
+                            );
+                          }
 
-                          /// Selector
-                          AdvisorSelector(
-                            advisors: advisors
-                                .map(
-                                  (e) => Advisor(
-                                    id: e.id,
-                                    firstName: e.firstName ?? "",
-                                    lastName: e.lastName ?? "",
-                                    rating: e.rating,
-                                    profilePicture: e.profilePicture,
-                                  ),
-                                )
-                                .toList(),
-                            onSelected: (a) async {
-                              // Map lại sang AdvisorModel
-                              final selectedModel = advisors.firstWhere(
-                                (x) => x.id == a.id,
-                              );
+                          return Column(
+                            children: [
+                              Text(
+                                "Hãy chọn người đồng hành phù hợp:",
+                                textAlign: TextAlign.center,
+                                style: t.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
 
-                              // Nếu chưa login (lý thuyết không xảy ra), chặn luôn
-                              if (user == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      "Bạn cần đăng nhập để chọn advisor.",
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-
-                              // Hiện dialog xác nhận
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (ctx) {
-                                  return AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    title: const Center(
-                                      child: Text("Xác nhận chọn advisor"),
-                                    ),
-                                    content: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        // Avatar trên
-                                        CircleAvatar(
-                                          radius: 32,
-                                          backgroundColor:
-                                              cs.surfaceContainerHighest,
-                                          backgroundImage:
-                                              (selectedModel.profilePicture !=
-                                                      null &&
-                                                  selectedModel
-                                                      .profilePicture!
-                                                      .isNotEmpty)
-                                              ? NetworkImage(
-                                                  selectedModel.profilePicture!,
-                                                )
-                                              : null,
-                                          child:
-                                              (selectedModel.profilePicture ==
-                                                      null ||
-                                                  selectedModel
-                                                      .profilePicture!
-                                                      .isEmpty)
-                                              ? Text(
-                                                  (selectedModel.firstName ??
-                                                          "?")
-                                                      .characters
-                                                      .first
-                                                      .toUpperCase(),
-                                                  style: t.titleMedium
-                                                      ?.copyWith(
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                )
-                                              : null,
-                                        ),
-                                        const SizedBox(height: 12),
-
-                                        // Tên
-                                        Text(
-                                          selectedModel.fullName,
-                                          textAlign: TextAlign.center,
-                                          style: t.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-
-                                        // Rating dưới tên
-                                        Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Icon(
-                                              Icons.star_rounded,
-                                              size: 18,
-                                              color: selectedModel.rating > 0
-                                                  ? Colors.amber
-                                                  : cs.outline,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              selectedModel.rating
-                                                  .toStringAsFixed(1),
-                                              style: t.bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 12),
-                                      ],
-                                    ),
-                                    actionsPadding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      12,
-                                    ),
-                                    actions: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: FilledButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(true),
-                                              child: const Text("Xác nhận"),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: FilledButton.tonal(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(false),
-                                              child: const Text("Hủy"),
-                                            ),
-                                          ),
-                                        ],
+                              AdvisorSelector(
+                                advisors: advisors
+                                    .map(
+                                      (e) => Advisor(
+                                        id: e.id,
+                                        firstName: e.firstName ?? "",
+                                        lastName: e.lastName ?? "",
+                                        rating: e.rating,
+                                        profilePicture: e.profilePicture,
                                       ),
-                                    ],
-                                  );
-                                },
-                              );
-
-                              if (confirmed == true) {
-                                // Gọi API assign advisor
-                                try {
-                                  final repo = ref.read(
-                                    advisorRepositoryProvider,
-                                  );
-                                  await repo.assignAdvisor(
-                                    userId: user.id,
-                                    advisorId: selectedModel.id,
+                                    )
+                                    .toList(),
+                                onSelected: (a) async {
+                                  final selectedModel = advisors.firstWhere(
+                                    (x) => x.id == a.id,
                                   );
 
-                                  setState(
-                                    () => _selectedAdvisor = selectedModel,
-                                  );
-
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          "Đã gán advisor: ${selectedModel.fullName} cho bạn!",
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                } catch (e) {
-                                  if (mounted) {
+                                  if (user == null) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          "Có lỗi khi gán advisor. Vui lòng thử lại.",
+                                          "Bạn cần đăng nhập để chọn advisor.",
                                         ),
                                       ),
                                     );
+                                    return;
                                   }
-                                }
-                              }
-                            },
-                          ),
-                        ],
+
+                                  final confirmed = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) {
+                                      return AlertDialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        title: const Center(
+                                          child: Text("Xác nhận chọn advisor"),
+                                        ),
+                                        content: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            CircleAvatar(
+                                              radius: 32,
+                                              backgroundColor:
+                                                  cs.surfaceContainerHighest,
+                                              backgroundImage:
+                                                  (selectedModel
+                                                              .profilePicture !=
+                                                          null &&
+                                                      selectedModel
+                                                          .profilePicture!
+                                                          .isNotEmpty)
+                                                  ? NetworkImage(
+                                                      selectedModel
+                                                          .profilePicture!,
+                                                    )
+                                                  : null,
+                                              child:
+                                                  (selectedModel
+                                                              .profilePicture ==
+                                                          null ||
+                                                      selectedModel
+                                                          .profilePicture!
+                                                          .isEmpty)
+                                                  ? Text(
+                                                      (selectedModel
+                                                                  .firstName ??
+                                                              "?")
+                                                          .characters
+                                                          .first
+                                                          .toUpperCase(),
+                                                      style: t.titleMedium
+                                                          ?.copyWith(
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                          ),
+                                                    )
+                                                  : null,
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Text(
+                                              selectedModel.fullName,
+                                              textAlign: TextAlign.center,
+                                              style: t.titleMedium?.copyWith(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.star_rounded,
+                                                  size: 18,
+                                                  color:
+                                                      selectedModel.rating > 0
+                                                      ? Colors.amber
+                                                      : cs.outline,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  selectedModel.rating
+                                                      .toStringAsFixed(1),
+                                                  style: t.bodySmall,
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                          ],
+                                        ),
+                                        actionsPadding:
+                                            const EdgeInsets.fromLTRB(
+                                              16,
+                                              0,
+                                              16,
+                                              12,
+                                            ),
+                                        actions: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: FilledButton(
+                                                  onPressed: () => Navigator.of(
+                                                    ctx,
+                                                  ).pop(true),
+                                                  child: const Text("Xác nhận"),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: FilledButton.tonal(
+                                                  onPressed: () => Navigator.of(
+                                                    ctx,
+                                                  ).pop(false),
+                                                  child: const Text("Hủy"),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+
+                                  if (confirmed == true) {
+                                    try {
+                                      final repo = ref.read(
+                                        advisorRepositoryProvider,
+                                      );
+                                      await repo.assignAdvisor(
+                                        userId: user.id,
+                                        advisorId: selectedModel.id,
+                                      );
+
+                                      setState(
+                                        () => _selectedAdvisor = selectedModel,
+                                      );
+
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              "Đã gán advisor: ${selectedModel.fullName} cho bạn!",
+                                            ),
+                                          ),
+                                        );
+                                      }
+
+                                      // Nếu muốn reload list sau khi gán:
+                                      // ref.invalidate(advisorsProvider);
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              "Có lỗi khi gán advisor. Vui lòng thử lại.",
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
 
                 const SizedBox(height: 20),
 
-                // ===========================
-                // NÚT CUỐI
-                // ===========================
                 if (!widget.success)
                   _buildFailedButtons(context)
                 else
@@ -320,7 +343,6 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
     );
   }
 
-  /// Nút khi thanh toán thất bại
   Widget _buildFailedButtons(BuildContext context) {
     return Row(
       children: [
@@ -341,13 +363,11 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
     );
   }
 
-  /// Nút khi thanh toán thành công
-  /// (chỉ điều hướng, không gọi assign nữa vì assign đã làm trong dialog)
   Widget _buildSuccessButton(BuildContext context) {
     return SizedBox(
       width: double.infinity,
       child: FilledButton(
-        onPressed: () => context.go('/home'),
+        onPressed: _handleGoHome,
         child: const Text("Tiếp tục vào trang chủ"),
       ),
     );

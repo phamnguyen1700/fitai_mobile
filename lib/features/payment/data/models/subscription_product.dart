@@ -19,7 +19,7 @@ class SubscriptionProduct {
   final String priceId;
   final String name;
   final String? description;
-  final int amount;
+  final double amount;
   final String currency;
   final BillingInterval interval;
   final bool isActive;
@@ -43,7 +43,7 @@ class SubscriptionProduct {
     required this.interval,
     required this.isActive,
 
-    required this.isAdvisor, // ⭐ Đưa vào constructor
+    required this.isAdvisor,
 
     this.startDate,
     this.endDate,

@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:fitai_mobile/features/auth/data/models/subscription_current_response.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/api/api_client.dart';
 import '../../../../core/api/api_constants.dart';
+import '../models/change_password_request.dart';
 import '../models/login_request.dart';
 import '../models/register_request.dart';
 import '../models/auth_response.dart';
@@ -101,13 +103,7 @@ class AuthRepository {
 
   // Logout user
   Future<void> logout() async {
-    try {
-      await _apiClient.logout();
-    } catch (e) {
-      // Even if API call fails, clear local tokens
-      await _clearLocalTokens();
-      rethrow;
-    }
+    await clearUserData();
   }
 
   // Check if user is currently authenticated
@@ -243,6 +239,14 @@ class AuthRepository {
     }
   }
 
+  Future<AuthResponse> resendOtp({required String email}) async {
+    try {
+      return await _authApiService.resendOtp(email: email);
+    } catch (e) {
+      throw Exception('OTP resend failed: $e');
+    }
+  }
+
   // Clear local tokens (used when logout fails)
   Future<void> _clearLocalTokens() async {
     await _secureStorage.delete(key: ApiConstants.accessTokenKey);
@@ -261,5 +265,76 @@ class AuthRepository {
   // Clear all user data
   Future<void> clearUserData() async {
     await _clearLocalTokens();
+  }
+
+  // trong AuthRepository
+
+  Future<AuthResponse> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final request = ChangePasswordRequest(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      final response = await _authApiService.changePassword(request);
+      // response.success = false, message = "Current password is incorrect"
+      return response;
+    } on DioException catch (e) {
+      // 🔌 Không có mạng / host unreachable
+      if (e.type == DioExceptionType.connectionError) {
+        throw Exception('Vui lòng kiểm tra lại kết nối Internet.');
+      }
+
+      // ⏱ Timeout
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw Exception('Vui lòng kiểm tra lại mạng và thử lại.');
+      }
+
+      // Các lỗi khác mà không có body dạng chuẩn -> generic
+      throw Exception('Đổi mật khẩu thất bại. Vui lòng thử lại sau.');
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi, vui lòng thử lại.');
+    }
+  }
+
+  /// Lấy gói subscription hiện tại của user đang đăng nhập
+  Future<SubscriptionCurrentResponse> getCurrentUserSubscription() async {
+    try {
+      // Lấy user từ cache/API (dùng luôn hàm có sẵn)
+      final user = await getCurrentUser();
+      if (user == null || user.id == null) {
+        throw Exception('Bạn chưa đăng nhập.');
+      }
+
+      // Gọi xuống AuthApiService
+      final response = await _authApiService.getCurrentUserSubscription(
+        user.id!,
+      );
+
+      // Ở đây response đã parse sẵn success, message, data
+      return response;
+    } on DioException catch (e) {
+      // 🔌 Không có mạng / host unreachable
+      if (e.type == DioExceptionType.connectionError) {
+        throw Exception('Vui lòng kiểm tra lại kết nối Internet.');
+      }
+
+      // ⏱ Timeout
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw Exception('Vui lòng kiểm tra lại mạng và thử lại.');
+      }
+
+      // Các lỗi khác mà không có body dạng chuẩn -> generic
+      throw Exception(
+        'Không thể lấy thông tin gói hiện tại. Vui lòng thử lại sau.',
+      );
+    } catch (e) {
+      throw Exception('Đã xảy ra lỗi, vui lòng thử lại.');
+    }
   }
 }

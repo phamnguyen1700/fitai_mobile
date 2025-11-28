@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:fitai_mobile/core/api/api_client.dart';
 import 'package:fitai_mobile/core/api/api_constants.dart';
+import 'package:fitai_mobile/core/status/bodygram_error.dart';
 import '../models/bodygram_upload_request.dart';
 import '../models/bodygram_upload_response.dart';
 import '../models/bodygram_analyze_request.dart';
@@ -40,9 +41,24 @@ class BodygramApiService {
   }
 
   Future<void> analyzeBodyImages(BodygramAnalyzeRequest request) async {
-    await _client.post<dynamic>(
-      ApiConstants.bodygramAnalyze,
-      data: request.toJson(),
-    );
+    try {
+      await _client.post<dynamic>(
+        ApiConstants.bodygramAnalyze,
+        data: request.toJson(),
+      );
+    } on DioException catch (e) {
+      final dynamic data = e.response?.data;
+      String? code;
+
+      if (data is Map && data['message'] is String) {
+        code = data['message'] as String;
+      }
+
+      if (code != null) {
+        throw BodygramAnalyzeException(resolveBodygramError(code));
+      }
+
+      rethrow;
+    }
   }
 }

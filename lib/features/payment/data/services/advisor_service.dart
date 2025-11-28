@@ -10,12 +10,18 @@ class AdvisorService {
   /// GET /api/advisor
   /// Lấy danh sách advisor khả dụng
   Future<List<AdvisorModel>> getAdvisors() async {
-    // kiểu trả về của ApiClient có thể là Response<dynamic>,
-    // tuỳ implementation của em – ở đây giả sử giống PaymentService
-    final res = await _client.get<List<dynamic>>(ApiConstants.advisorList);
+    // IMPORTANT: dùng <dynamic> để Dio KHÔNG cố cast sang List
+    final res = await _client.get<dynamic>(ApiConstants.advisorList);
 
-    final data = res.data ?? <dynamic>[];
-    return AdvisorModel.listFromJson(data);
+    final root = res.data;
+    // Debug nếu muốn:
+    // print('advisor root type = ${root.runtimeType}');
+    if (root is! Map<String, dynamic>) {
+      return [];
+    }
+
+    final list = root['data'] as List<dynamic>? ?? <dynamic>[];
+    return AdvisorModel.listFromJson(list);
   }
 
   /// POST /api/advisor/assign-advisor

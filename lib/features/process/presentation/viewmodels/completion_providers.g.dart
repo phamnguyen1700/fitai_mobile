@@ -9,7 +9,7 @@ part of 'completion_providers.dart';
 String _$completionRepositoryHash() =>
     r'0ca85390b972852516a303386defcc7a1b973265';
 
-/// Repo provider – để chỗ khác có thể override khi test
+/// Repo provider (singleton)
 ///
 /// Copied from [completionRepository].
 @ProviderFor(completionRepository)
@@ -27,10 +27,37 @@ final completionRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef CompletionRepositoryRef = AutoDisposeProviderRef<CompletionRepository>;
-String _$previousCompletionDataHash() =>
-    r'37dfa1967d88a991a25aa4994031eb30798f1fec';
+String _$previousCompletionResultHash() =>
+    r'0cc5d138b820c3d2cc965b85e27aca0ff11c23fa';
 
-/// Lấy full data của previous checkpoint
+/// ======================================
+/// Lấy full CompletionResult từ repo
+/// ======================================
+///
+/// Copied from [previousCompletionResult].
+@ProviderFor(previousCompletionResult)
+final previousCompletionResultProvider =
+    AutoDisposeFutureProvider<CompletionResult>.internal(
+      previousCompletionResult,
+      name: r'previousCompletionResultProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$previousCompletionResultHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef PreviousCompletionResultRef =
+    AutoDisposeFutureProviderRef<CompletionResult>;
+String _$previousCompletionDataHash() =>
+    r'ff8103870ee21ce08995ac244d8440b9ddc0accc';
+
+/// ======================================
+/// Chỉ lấy phần data cho UI
+/// (CompletionPercentData? hoặc null)
+/// ======================================
 ///
 /// Copied from [previousCompletionData].
 @ProviderFor(previousCompletionData)
@@ -50,10 +77,12 @@ final previousCompletionDataProvider =
 typedef PreviousCompletionDataRef =
     AutoDisposeFutureProviderRef<CompletionPercentData?>;
 String _$previousCompletionProgressHash() =>
-    r'69aa5bbfd562038c298fb8e002f549e21ea331dd';
+    r'5f48bf7c41bad6b07f57e0c8178255302e62be9d';
 
-/// Lấy progress đã chuẩn hoá 0.0–1.0
-/// Dùng để map vào WeeklyCheckInCard.progress
+/// ======================================
+/// Lấy progress cho WeeklyCheckInCard
+/// result.status != has_plan → progress = 0
+/// ======================================
 ///
 /// Copied from [previousCompletionProgress].
 @ProviderFor(previousCompletionProgress)
@@ -71,5 +100,27 @@ final previousCompletionProgressProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef PreviousCompletionProgressRef = AutoDisposeFutureProviderRef<double>;
+String _$checkpointStatusHash() => r'46f01fae5c9bcac3c86ae37a3c33d7db87172d4c';
+
+/// ======================================
+/// STATUS PROVIDER (dùng cho OnboardingGate)
+/// Trả về: "has_plan" | "no_plan" | "error" | "loading"
+/// ======================================
+///
+/// Copied from [checkpointStatus].
+@ProviderFor(checkpointStatus)
+final checkpointStatusProvider = AutoDisposeProvider<String>.internal(
+  checkpointStatus,
+  name: r'checkpointStatusProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$checkpointStatusHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CheckpointStatusRef = AutoDisposeProviderRef<String>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

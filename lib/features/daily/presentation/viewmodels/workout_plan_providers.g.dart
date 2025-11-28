@@ -27,12 +27,12 @@ final workoutPlanRepositoryProvider =
 typedef WorkoutPlanRepositoryRef =
     AutoDisposeProviderRef<WorkoutPlanRepository>;
 String _$workoutPlanScheduleHash() =>
-    r'2be2e56dc4a89fd0b753e3010bbdc6b3c836d437';
+    r'cd1cfc68fd1fe18307ce7346956231849f5672e5';
 
 /// See also [workoutPlanSchedule].
 @ProviderFor(workoutPlanSchedule)
 final workoutPlanScheduleProvider =
-    AutoDisposeFutureProvider<WorkoutPlanScheduleData>.internal(
+    AutoDisposeFutureProvider<WorkoutPlanScheduleData?>.internal(
       workoutPlanSchedule,
       name: r'workoutPlanScheduleProvider',
       debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -45,8 +45,8 @@ final workoutPlanScheduleProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef WorkoutPlanScheduleRef =
-    AutoDisposeFutureProviderRef<WorkoutPlanScheduleData>;
-String _$workoutPlanDaysHash() => r'b2314230d06e7c1aaa8e810f62db20548531f3da';
+    AutoDisposeFutureProviderRef<WorkoutPlanScheduleData?>;
+String _$workoutPlanDaysHash() => r'92fa27bde61bdde57dedea9644553467bb5f5230';
 
 /// See also [workoutPlanDays].
 @ProviderFor(workoutPlanDays)

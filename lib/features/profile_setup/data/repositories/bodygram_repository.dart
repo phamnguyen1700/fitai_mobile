@@ -88,7 +88,6 @@ class BodygramRepository {
     // (tuỳ bạn, nếu muốn dùng lại sau thì có thể gán ngược vào draft)
     // draft.frontBodyPhotoPath = normalizedFront.path;
     // draft.sideBodyPhotoPath  = normalizedSide.path;
-
     // 8. Tạo request upload với file đã normalize
     final req = BodygramUploadRequest(
       height: height,

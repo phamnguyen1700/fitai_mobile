@@ -83,7 +83,9 @@ class AppScaffold extends StatelessWidget {
       extendBodyBehindAppBar: true,
       appBar: appBar,
       body: SafeArea(top: true, bottom: false, child: body),
-      bottomNavigationBar: bottomWidget,
+      bottomNavigationBar: bottomWidget == null
+          ? null
+          : SafeArea(top: false, bottom: true, child: bottomWidget),
     );
   }
 }

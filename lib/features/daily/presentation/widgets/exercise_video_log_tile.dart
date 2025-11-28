@@ -1,6 +1,4 @@
 // lib/features/daily/presentation/widgets/exercise_video_log_tile.dart
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,7 +7,6 @@ import 'package:video_player/video_player.dart';
 
 // Widget tạo thumbnail từ local path / network url
 import 'package:fitai_mobile/core/widgets/network_thumb_video.dart';
-import 'package:fitai_mobile/features/daily/presentation/widgets/user_video.dart';
 
 /// Tile bài tập: phát video hướng dẫn + cho phép chọn video tự quay để log
 class ExerciseVideoLogTile extends StatefulWidget {
@@ -34,6 +31,7 @@ class ExerciseVideoLogTile extends StatefulWidget {
 
   /// Callback khi user chọn video mới: [localFilePath]
   final void Function(String localFilePath)? onVideoPicked;
+  final bool isUploading;
 
   const ExerciseVideoLogTile({
     super.key,
@@ -46,6 +44,7 @@ class ExerciseVideoLogTile extends StatefulWidget {
     this.demoVideoUrl,
     this.existingLogVideoUrl,
     this.onVideoPicked,
+    this.isUploading = false,
   });
 
   /// Meta: "30 phút" hoặc "3 sets × 12 reps"
@@ -62,16 +61,12 @@ class ExerciseVideoLogTile extends StatefulWidget {
 class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
   VideoPlayerController? _controller;
   bool _initialized = false;
-  bool _isPlaying = false;
   bool _isMuted = true;
   bool _isLoading = false;
   bool _hasError = false;
 
   /// Khi video chạy tới cuối -> show nút replay
   bool _showReplay = false;
-
-  /// File video user vừa chọn (local)
-  String? _pickedVideoPath;
 
   /// volume 0–1 cho slider
   double _volume = 0.0;
@@ -106,7 +101,6 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
     // Nếu đã tới cuối và dừng -> show replay
     if (!v.isPlaying && v.position >= v.duration && !_showReplay) {
       setState(() {
-        _isPlaying = false;
         _showReplay = true;
       });
     }
@@ -145,7 +139,6 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
       if (!mounted) return;
       setState(() {
         _initialized = true;
-        _isPlaying = true;
         _isLoading = false;
         _volume = _isMuted ? 0.0 : 1.0;
       });
@@ -171,12 +164,11 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
 
     if (v.isPlaying) {
       _controller!.pause();
-      setState(() => _isPlaying = false);
+      setState(() {});
     } else {
       _controller!.setVolume(_isMuted ? 0 : 1);
       _controller!.play();
       setState(() {
-        _isPlaying = true;
         _showReplay = false;
       });
     }
@@ -188,7 +180,6 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
     _controller!.setVolume(_isMuted ? 0 : 1);
     _controller!.play();
     setState(() {
-      _isPlaying = true;
       _showReplay = false;
     });
   }
@@ -239,10 +230,6 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
     );
     if (picked == null) return;
 
-    setState(() {
-      _pickedVideoPath = picked.path;
-    });
-
     widget.onVideoPicked?.call(picked.path);
 
     // ❌ Không auto play nữa, video chính luôn là demo
@@ -260,9 +247,7 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
     final hasMeta = description.isNotEmpty;
     final hasNote = note != null && note.trim().isNotEmpty;
 
-    final hasUserVideo =
-        _pickedVideoPath != null ||
-        (widget.existingLogVideoUrl?.isNotEmpty ?? false);
+    final hasUserVideo = widget.existingLogVideoUrl?.isNotEmpty ?? false;
 
     final thumbSource = _thumbSource;
 
@@ -444,7 +429,7 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
                         if (hasNote)
                           Expanded(
                             child: Text(
-                              note!,
+                              note,
                               style: bodySmall?.copyWith(
                                 color: cs.onSurfaceVariant,
                               ),
@@ -456,7 +441,7 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
                       ],
                     ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 5),
 
                   // Nút giống "Tải ảnh bữa ăn"
                   Align(
@@ -470,59 +455,36 @@ class _ExerciseVideoLogTileState extends State<ExerciseVideoLogTile> {
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         minimumSize: Size.zero,
                       ),
-                      onPressed: _pickVideo,
-                      icon: Icon(
-                        Icons.videocam_outlined,
-                        size: 18,
-                        color: cs.primary,
-                      ),
+                      onPressed: widget.isUploading ? null : _pickVideo,
+                      icon: widget.isUploading
+                          ? SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: cs.primary,
+                              ),
+                            )
+                          : Icon(
+                              Icons.videocam_outlined,
+                              size: 18,
+                              color: cs.primary,
+                            ),
                       label: Text(
-                        hasUserVideo
+                        widget.isUploading
+                            ? 'Đang tải video bài tập...'
+                            : hasUserVideo
                             ? 'Đổi video bài tập'
                             : 'Tải video bài tập',
                         style: bodySmall?.copyWith(
-                          color: cs.primary,
+                          color: widget.isUploading
+                              ? cs.onSurfaceVariant
+                              : cs.primary,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                   ),
-
-                  if (_pickedVideoPath != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Đã chọn video',
-                        style: bodySmall?.copyWith(
-                          color: cs.primary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    )
-                  else if (widget.existingLogVideoUrl != null &&
-                      widget.existingLogVideoUrl!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        'Đã có video log',
-                        style: bodySmall?.copyWith(
-                          color: cs.primary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                    ),
-
-                  // 🆕 VIDEO CỦA NGƯỜI DÙNG + COMMENT Ở DƯỚI
-                  if (hasUserVideo)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: UserExerciseVideoSection(
-                        title: widget.title,
-                        localVideoPath: _pickedVideoPath,
-                        existingVideoUrl: widget.existingLogVideoUrl,
-                        // Sau này có thể truyền comments & onSubmitComment từ ngoài vào
-                      ),
-                    ),
                 ],
               ),
             ),
