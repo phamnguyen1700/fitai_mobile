@@ -12,6 +12,7 @@ UserModel _$UserModelFromJson(Map<String, dynamic> json) => UserModel(
   token: json['token'] as String?,
   onboardingStep: json['onboardingStep'] as String?,
   message: json['message'] as String?,
+  subscriptionProductName: json['subscriptionProductName'] as String?,
   firstName: json['firstName'] as String?,
   lastName: json['lastName'] as String?,
   fullName: json['fullName'] as String?,
@@ -28,7 +29,7 @@ UserModel _$UserModelFromJson(Map<String, dynamic> json) => UserModel(
   goal: $enumDecodeNullable(
     _$GoalEnumMap,
     json['goal'],
-    unknownValue: Goal.Maintain_Weight,
+    unknownValue: Goal.Maintenance,
   ),
   height: _toDouble(json['height']),
   weight: _toDouble(json['weight']),
@@ -45,6 +46,7 @@ Map<String, dynamic> _$UserModelToJson(UserModel instance) => <String, dynamic>{
   'token': instance.token,
   'onboardingStep': instance.onboardingStep,
   'message': instance.message,
+  'subscriptionProductName': instance.subscriptionProductName,
   'firstName': instance.firstName,
   'lastName': instance.lastName,
   'fullName': instance.fullName,
@@ -64,9 +66,8 @@ const _$GenderEnumMap = {Gender.M: 'M', Gender.F: 'F'};
 
 const _$GoalEnumMap = {
   Goal.Weight_Loss: 'Weight_Loss',
+  Goal.Maintenance: 'Maintenance',
   Goal.Weight_Gain: 'Weight_Gain',
-  Goal.Maintain_Weight: 'Maintain_Weight',
-  Goal.Build_Muscle: 'Build_Muscle',
 };
 
 const _$ActivityLevelEnumMap = {

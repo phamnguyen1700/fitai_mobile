@@ -91,7 +91,43 @@ final authErrorProvider = AutoDisposeProvider<String?>.internal(
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AuthErrorRef = AutoDisposeProviderRef<String?>;
-String _$authNotifierHash() => r'be395d93ca82d9d3d2f1f2e827bcdece98382062';
+String _$currentSubscriptionHash() =>
+    r'e4627988d9993bd7a47a0e754e5535be57583eb0';
+
+/// See also [currentSubscription].
+@ProviderFor(currentSubscription)
+final currentSubscriptionProvider =
+    AutoDisposeProvider<SubscriptionData?>.internal(
+      currentSubscription,
+      name: r'currentSubscriptionProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$currentSubscriptionHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CurrentSubscriptionRef = AutoDisposeProviderRef<SubscriptionData?>;
+String _$currentTierTypeHash() => r'a6557015292fec8f4f0a2baefe9c0ac3c2e6add1';
+
+/// See also [currentTierType].
+@ProviderFor(currentTierType)
+final currentTierTypeProvider = AutoDisposeProvider<String?>.internal(
+  currentTierType,
+  name: r'currentTierTypeProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$currentTierTypeHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef CurrentTierTypeRef = AutoDisposeProviderRef<String?>;
+String _$authNotifierHash() => r'f510aebc04b50b96d47c17a0d0fd749b8a7c9dd2';
 
 /// See also [AuthNotifier].
 @ProviderFor(AuthNotifier)
@@ -107,5 +143,25 @@ final authNotifierProvider =
     );
 
 typedef _$AuthNotifier = AutoDisposeAsyncNotifier<AuthState>;
+String _$subscriptionNotifierHash() =>
+    r'fca332b869b8da2ff6ffce50b183d3972d3c1d36';
+
+/// See also [SubscriptionNotifier].
+@ProviderFor(SubscriptionNotifier)
+final subscriptionNotifierProvider =
+    AutoDisposeAsyncNotifierProvider<
+      SubscriptionNotifier,
+      SubscriptionData?
+    >.internal(
+      SubscriptionNotifier.new,
+      name: r'subscriptionNotifierProvider',
+      debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+          ? null
+          : _$subscriptionNotifierHash,
+      dependencies: null,
+      allTransitiveDependencies: null,
+    );
+
+typedef _$SubscriptionNotifier = AutoDisposeAsyncNotifier<SubscriptionData?>;
 // ignore_for_file: type=lint
 // ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package

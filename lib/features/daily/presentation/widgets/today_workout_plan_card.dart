@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:fitai_mobile/core/widgets/onboarding_gate.dart';
 import 'package:fitai_mobile/features/daily/data/models/workout_plan_models.dart';
+import 'package:fitai_mobile/features/daily/data/models/upload_image.dart';
 import 'package:fitai_mobile/features/daily/presentation/widgets/exercise_video_log_tile.dart';
+import 'package:fitai_mobile/features/daily/presentation/widgets/user_video.dart';
 import 'package:fitai_mobile/features/daily/presentation/widgets/workout_day_selector.dart';
 import 'package:fitai_mobile/features/daily/presentation/viewmodels/workout_plan_providers.dart';
 import 'package:fitai_mobile/features/daily/presentation/viewmodels/workout_video_providers.dart';
@@ -15,10 +19,14 @@ class TodayWorkoutPlanCard extends ConsumerStatefulWidget {
     super.key,
     required this.days,
     this.initialDayNumber,
+    this.onboardingStep,
+    this.waitingReviewMessage,
   });
 
   final List<WorkoutPlanDayModel> days;
   final int? initialDayNumber;
+  final String? onboardingStep;
+  final String? waitingReviewMessage;
 
   @override
   ConsumerState<TodayWorkoutPlanCard> createState() =>
@@ -40,9 +48,11 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
   late List<double> _exerciseHeights;
 
   /// chặn spam upload
-  bool _isUploading = false;
+  String? _uploadingExerciseId;
 
-  List<WorkoutPlanDayModel> get _days => widget.days;
+  late List<WorkoutPlanDayModel> _daysState;
+
+  List<WorkoutPlanDayModel> get _days => _daysState;
 
   bool get _hasDays => _days.isNotEmpty;
 
@@ -55,7 +65,21 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
     super.initState();
     _pageController = PageController();
     _selectedDayIndex = _resolveInitialDayIndex();
+    _daysState = _cloneDays(widget.days);
     _initHeightsForDay(_selectedDayIndex);
+  }
+
+  List<WorkoutPlanDayModel> _cloneDays(List<WorkoutPlanDayModel> source) {
+    return source
+        .map(
+          (day) => WorkoutPlanDayModel(
+            dayNumber: day.dayNumber,
+            dayName: day.dayName,
+            totalExercises: day.totalExercises,
+            exercises: List<WorkoutExerciseModel>.from(day.exercises),
+          ),
+        )
+        .toList();
   }
 
   int _resolveInitialDayIndex() {
@@ -85,6 +109,7 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
   void didUpdateWidget(covariant TodayWorkoutPlanCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.days != widget.days) {
+      _daysState = _cloneDays(widget.days);
       _selectedDayIndex = _resolveInitialDayIndex();
       _pageController.jumpToPage(0);
       _initHeightsForDay(_selectedDayIndex);
@@ -113,20 +138,18 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
     required WorkoutExerciseModel exercise,
     required String localPath,
   }) async {
-    if (_isUploading) return;
+    if (_uploadingExerciseId != null) return;
 
     final file = File(localPath);
 
     setState(() {
-      _isUploading = true;
+      _uploadingExerciseId = exercise.exerciseId;
     });
 
     try {
-      final controller = ref.read(
-        workoutVideoUploadControllerProvider.notifier,
-      );
+      final repo = ref.read(workoutVideoRepositoryProvider);
 
-      final res = await controller.upload(
+      final res = await repo.uploadAndComplete(
         dayNumber: dayNumber,
         exerciseId: exercise.exerciseId,
         videoFile: file,
@@ -136,6 +159,11 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
         // reload lại lịch tập để lấy videoLogUrl + isCompleted mới
         ref.invalidate(workoutPlanDaysProvider);
         ref.invalidate(workoutPlanScheduleProvider);
+
+        final data = res.data;
+        if (data != null) {
+          _applyUploadResult(data, exercise);
+        }
       } else {
         if (mounted) {
           ScaffoldMessenger.of(
@@ -155,10 +183,50 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
     } finally {
       if (mounted) {
         setState(() {
-          _isUploading = false;
+          _uploadingExerciseId = null;
         });
       }
     }
+  }
+
+  void _applyUploadResult(
+    UploadWorkoutVideoData data,
+    WorkoutExerciseModel exercise,
+  ) {
+    setState(() {
+      _daysState = _daysState.map((day) {
+        if (day.dayNumber != data.dayNumber) return day;
+
+        final updatedExercises = day.exercises.map((ex) {
+          if (ex.exerciseId != exercise.exerciseId) return ex;
+
+          return WorkoutExerciseModel(
+            exerciseLogId: data.exerciseLogId ?? ex.exerciseLogId,
+            exerciseId: ex.exerciseId,
+            name: ex.name,
+            description: ex.description,
+            category: ex.category,
+            videoUrl: ex.videoUrl,
+            level: ex.level,
+            sets: ex.sets,
+            reps: ex.reps,
+            durationMinutes: ex.durationMinutes,
+            note: ex.note,
+            isCompleted: data.isCompleted,
+            commentCount: ex.commentCount,
+            advisorReview: ex.advisorReview,
+            videoLogUrl: data.photoUrl,
+          );
+        }).toList();
+
+        return WorkoutPlanDayModel(
+          dayNumber: day.dayNumber,
+          dayName: day.dayName,
+          totalExercises: day.totalExercises,
+          exercises: updatedExercises,
+        );
+      }).toList();
+    });
   }
 
   @override
@@ -166,10 +234,14 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
-    if (!_hasDays) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Container(
+    final waitingMessage =
+        widget.waitingReviewMessage ??
+        'Kế hoạch của bạn đang chờ advisor duyệt. Vui lòng đợi trong giây lát.';
+
+    Widget buildCardContent() {
+      if (!_hasDays) {
+        // 🔁 Giống TodayMealPlan empty-state
+        return Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
           decoration: BoxDecoration(
@@ -184,7 +256,7 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
                 'Buổi tập hôm nay',
                 style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 4),
               Center(
                 child: Text(
                   'Hôm nay chưa có buổi tập nào.',
@@ -194,24 +266,21 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
               ),
             ],
           ),
-        ),
-      );
-    }
+        );
+      }
 
-    final exercises = _currentExercises;
+      final exercises = _currentExercises;
 
-    // ===== TÍNH CHIỀU CAO GIỐNG MEAL =====
-    final currentHeight =
-        (_currentExerciseIndex < _exerciseHeights.length &&
-            _exerciseHeights[_currentExerciseIndex] > 0)
-        ? _exerciseHeights[_currentExerciseIndex]
-        : _minHeight;
+      // ===== TÍNH CHIỀU CAO GIỐNG MEAL =====
+      final currentHeight =
+          (_currentExerciseIndex < _exerciseHeights.length &&
+              _exerciseHeights[_currentExerciseIndex] > 0)
+          ? _exerciseHeights[_currentExerciseIndex]
+          : _minHeight;
 
-    final double targetHeight = max(currentHeight, _minHeight).toDouble();
+      final double targetHeight = max(currentHeight, _minHeight).toDouble();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
+      return Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         decoration: BoxDecoration(
@@ -280,6 +349,8 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
                           localPath: localPath,
                         ),
                         onSizeChanged: (size) => _onExerciseSize(i, size),
+                        isUploading:
+                            _uploadingExerciseId == exercises[i].exerciseId,
                       ),
                   ],
                 ),
@@ -329,6 +400,17 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
             ],
           ],
         ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: OnboardingGate(
+        onboardingStep: widget.onboardingStep,
+        shouldLock: (step) => step == 'waitingreview',
+        lockTitle: 'Đang chờ advisor duyệt',
+        lockMessage: waitingMessage,
+        child: buildCardContent(),
       ),
     );
   }
@@ -343,6 +425,7 @@ class _TodayWorkoutPlanCardState extends ConsumerState<TodayWorkoutPlanCard> {
         exercise: ex,
         localPath: localPath,
       ),
+      isUploading: _uploadingExerciseId == ex.exerciseId,
     );
   }
 }
@@ -355,6 +438,7 @@ class _WorkoutExerciseWithComments extends ConsumerStatefulWidget {
     required this.exerciseLogId,
     required this.onVideoPicked,
     this.onSizeChanged,
+    this.isUploading = false,
     super.key,
   });
 
@@ -363,6 +447,7 @@ class _WorkoutExerciseWithComments extends ConsumerStatefulWidget {
   final String exerciseLogId;
   final Future<void> Function(String localPath) onVideoPicked;
   final OnWidgetSizeChange? onSizeChanged;
+  final bool isUploading;
 
   @override
   ConsumerState<_WorkoutExerciseWithComments> createState() =>
@@ -408,25 +493,18 @@ class _WorkoutExerciseWithCommentsState
       workoutCommentsControllerProvider(widget.exerciseLogId),
     );
 
-    final isSubmitting = asyncComments.isLoading;
+    const double commentSectionHeight = 170;
+    final userVideoUrl = widget.exercise.videoLogUrl;
+    final bool hasUserVideo = userVideoUrl != null && userVideoUrl.isNotEmpty;
+    final int? completionPercentValue = widget
+        .exercise
+        .advisorReview
+        ?.completionPercent
+        ?.round();
+    final bool isExerciseCompleted = widget.exercise.isCompleted;
 
-    // 👉 TÍNH CHIỀU CAO PHẦN COMMENT
-    final bool hasComments = asyncComments.maybeWhen(
-      data: (data) => data.comments.isNotEmpty,
-      orElse: () => false,
-    );
-
-    // Có comment => 200, không có => thấp hơn (tuỳ em chỉnh)
-    const double _noCommentHeight = 110;
-    const double _hasCommentHeight = 200;
-    final double commentSectionHeight = hasComments
-        ? _hasCommentHeight
-        : _noCommentHeight;
-
-    // ✅ Bọc toàn bộ widget bằng _MeasureSize để báo size ra ngoài
     return _MeasureSize(
       onChange: (size) {
-        // callback cho TodayWorkoutPlanCard
         if (widget.onSizeChanged != null) {
           widget.onSizeChanged!(size);
         }
@@ -445,10 +523,17 @@ class _WorkoutExerciseWithCommentsState
             demoVideoUrl: widget.exercise.videoUrl,
             existingLogVideoUrl: widget.exercise.videoLogUrl,
             onVideoPicked: widget.onVideoPicked,
+            isUploading: widget.isUploading,
           ),
-
+          if (hasUserVideo) ...[
+            UserExerciseVideoSection(
+              title: widget.exercise.name,
+              existingVideoUrl: userVideoUrl,
+              isCompleted: isExerciseCompleted,
+              completionPercent: completionPercentValue,
+            ),
+          ],
           const SizedBox(height: 8),
-
           // Comment section thật
           SizedBox(
             height: commentSectionHeight,
@@ -486,20 +571,28 @@ class _WorkoutExerciseWithCommentsState
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 6),
-
                   // Danh sách comment
                   Expanded(
                     child: asyncComments.when(
-                      loading: () => Align(
-                        alignment: Alignment.topLeft,
-                        child: Text(
-                          'Đang tải nhận xét...',
-                          style: t.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
+                      loading: () => Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.6,
+                              color: cs.primary,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Đang tải nhận xét...',
+                            style: t.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                       error: (e, _) => Align(
                         alignment: Alignment.topLeft,
@@ -512,111 +605,135 @@ class _WorkoutExerciseWithCommentsState
                         final comments = data.comments;
 
                         if (comments.isEmpty) {
-                          return Align(
-                            alignment: Alignment.topLeft,
-                            child: Text(
-                              'Chưa có nhận xét nào.',
-                              style: t.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                              ),
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 26,
+                                  color: cs.onSurfaceVariant.withOpacity(0.8),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Chưa có nhận xét nào',
+                                  textAlign: TextAlign.center,
+                                  style: t.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Hãy gửi câu hỏi cho coach nhé!',
+                                  textAlign: TextAlign.center,
+                                  style: t.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant.withOpacity(0.8),
+                                  ),
+                                ),
+                              ],
                             ),
                           );
                         }
 
+                        final items = comments.map((c) {
+                          final isCoach =
+                              c.senderType.toLowerCase() == 'advisor';
+
+                          final bubbleColor = isCoach
+                              ? cs.tertiaryContainer
+                              : cs.surfaceVariant;
+
+                          final textColor = isCoach
+                              ? cs.onTertiaryContainer
+                              : cs.onSurface;
+
+                          final icon = isCoach
+                              ? Icons.fitness_center_outlined
+                              : Icons.person_outline;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  icon,
+                                  size: 16,
+                                  color: isCoach
+                                      ? cs.tertiary
+                                      : cs.onSurfaceVariant,
+                                ),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  fit: FlexFit.loose,
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: bubbleColor,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  c.senderName ??
+                                                      (isCoach
+                                                          ? 'Coach'
+                                                          : 'Bạn'),
+                                                  style: t.labelSmall?.copyWith(
+                                                    fontWeight: FontWeight.w600,
+                                                    color: textColor
+                                                        .withOpacity(0.9),
+                                                  ),
+                                                ),
+                                              ),
+                                              InkWell(
+                                                onTap: () =>
+                                                    _handleDelete(c.id),
+                                                child: Icon(
+                                                  Icons.close_rounded,
+                                                  size: 14,
+                                                  color: textColor.withOpacity(
+                                                    0.6,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            c.content,
+                                            style: t.bodySmall?.copyWith(
+                                              color: textColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList();
+
                         return SingleChildScrollView(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: comments.map((c) {
-                              final isCoach =
-                                  c.senderType.toLowerCase() == 'advisor';
-
-                              final bubbleColor = isCoach
-                                  ? cs.tertiaryContainer
-                                  : cs.surfaceVariant;
-
-                              final textColor = isCoach
-                                  ? cs.onTertiaryContainer
-                                  : cs.onSurface;
-
-                              final icon = isCoach
-                                  ? Icons.fitness_center_outlined
-                                  : Icons.person_outline;
-
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 3,
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Icon(
-                                      icon,
-                                      size: 16,
-                                      color: isCoach
-                                          ? cs.tertiary
-                                          : cs.onSurfaceVariant,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 6,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: bubbleColor,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
-                                                    c.senderName ??
-                                                        (isCoach
-                                                            ? 'Coach'
-                                                            : 'Bạn'),
-                                                    style: t.labelSmall
-                                                        ?.copyWith(
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          color: textColor
-                                                              .withOpacity(0.9),
-                                                        ),
-                                                  ),
-                                                ),
-                                                InkWell(
-                                                  onTap: () =>
-                                                      _handleDelete(c.id),
-                                                  child: Icon(
-                                                    Icons.close_rounded,
-                                                    size: 14,
-                                                    color: textColor
-                                                        .withOpacity(0.6),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              c.content,
-                                              style: t.bodySmall?.copyWith(
-                                                color: textColor,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
+                            children: items,
                           ),
                         );
                       },
@@ -650,26 +767,28 @@ class _WorkoutExerciseWithCommentsState
                               borderRadius: BorderRadius.circular(999),
                               borderSide: BorderSide(color: cs.outlineVariant),
                             ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(999),
+                              borderSide: BorderSide(color: cs.outlineVariant),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(999),
+                              borderSide: BorderSide(
+                                color: cs.primary,
+                                width: 1.2,
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 6),
                       IconButton(
-                        icon: isSubmitting
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: cs.primary,
-                                ),
-                              )
-                            : Icon(
-                                Icons.send_rounded,
-                                size: 18,
-                                color: cs.primary,
-                              ),
-                        onPressed: isSubmitting ? null : _handleSend,
+                        icon: Icon(
+                          Icons.send_rounded,
+                          size: 18,
+                          color: cs.primary,
+                        ),
+                        onPressed: _handleSend,
                       ),
                     ],
                   ),

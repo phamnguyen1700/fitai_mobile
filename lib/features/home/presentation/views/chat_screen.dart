@@ -14,6 +14,7 @@ import 'package:fitai_mobile/features/home/presentation/viewmodels/chat_thread_p
 import 'package:fitai_mobile/core/widgets/app_chat_bubble.dart';
 import 'package:fitai_mobile/core/widgets/app_chat_input_bar.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
 
 class HomeHostScreen extends ConsumerWidget {
   const HomeHostScreen({super.key});
@@ -32,14 +33,16 @@ class HomeHostScreen extends ConsumerWidget {
       return const PlanPreviewBody();
     }
 
-    final plan = ref.watch(subscriptionPlanProvider);
+    // 👇 Lấy tierType từ subscriptionNotifier
+    final tierType = ref.watch(currentTierTypeProvider);
+    final tier = tierType?.toUpperCase();
 
-    // FREE → chỉ hiện teaser
-    if (plan == SubscriptionPlan.free) {
+    // FREE (hoặc chưa có sub) → chỉ hiện teaser bán gói
+    if (tier == null || tier == 'FREE') {
       return const _FreePlanTeaser();
     }
 
-    // PRO → giao cho host widget xử lý list / chat
+    // Premium / VIP / bất cứ gì khác FREE → cho vào chat list
     return const _ProPlanHost();
   }
 }

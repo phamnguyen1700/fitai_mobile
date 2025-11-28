@@ -27,7 +27,6 @@ class SubscriptionsScreen extends ConsumerWidget {
       appBar: const AppAppBar(title: 'Nâng cấp gói'),
       showLegalFooter: true,
       body: ListView(
-        padding: const EdgeInsets.all(12),
         children: [
           const SizedBox(height: 20),
           Center(

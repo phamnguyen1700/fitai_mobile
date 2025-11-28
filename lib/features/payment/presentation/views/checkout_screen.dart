@@ -4,39 +4,59 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
-import 'package:fitai_mobile/features/payment/data/services/payment_service.dart';
-import 'package:fitai_mobile/features/payment/data/repositories/payment_repository.dart';
+import 'package:fitai_mobile/features/payment/presentation/viewmodels/payment_controller.dart';
 
 import '../../../../core/widgets/app_bar.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../data/models/subscription_product.dart';
 import '../viewmodels/subscriptions_provider.dart';
 
-class CheckoutScreen extends ConsumerStatefulWidget {
-  const CheckoutScreen({super.key});
+class CheckoutScreen extends ConsumerWidget {
   static const _imgPath = 'lib/core/assets/images';
 
-  @override
-  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
-}
+  /// Gói được chọn truyền từ BuyingScreen (có thể null).
+  /// Nếu null thì sẽ fallback lấy từ subscriptionsProvider.
+  final SubscriptionProduct? product;
 
-class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  bool _isPaying = false;
+  /// Callback back (dùng cho BuyingScreen, có thể null).
+  final VoidCallback? onBack;
+
+  const CheckoutScreen({super.key, this.product, this.onBack});
 
   @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(subscriptionsProvider);
-    final plan = state.selectedProduct;
-    final notifier = ref.read(subscriptionsProvider.notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final subState = ref.watch(subscriptionsProvider);
+    final subNotifier = ref.read(subscriptionsProvider.notifier);
+
+    // Nếu có product truyền vào thì dùng, không thì lấy từ provider
+    final plan = product ?? subState.selectedProduct;
 
     if (plan == null) {
-      return const AppScaffold(
-        appBar: AppAppBar(title: 'Thanh toán'),
-        body: Center(child: Text('Vui lòng chọn gói trước.')),
+      return AppScaffold(
+        appBar: const AppAppBar(title: 'Thanh toán'),
+        body: Center(
+          child: TextButton(
+            onPressed: () {
+              // nếu có onBack (từ BuyingScreen) thì gọi,
+              // không thì pop route về /payment
+              if (onBack != null) {
+                onBack!();
+              } else {
+                Navigator.of(context).pop();
+              }
+            },
+            child: const Text('Vui lòng chọn gói trước. Quay lại'),
+          ),
+        ),
       );
     }
 
     final t = Theme.of(context).textTheme;
     final messenger = ScaffoldMessenger.of(context);
+
+    // State của PaymentController (AsyncValue<void>)
+    final paymentState = ref.watch(paymentControllerProvider);
+    final isPaying = paymentState.isLoading;
 
     Widget rowKV(String k, String v, {Color? vColor, FontWeight? vWeight}) {
       return Row(
@@ -54,6 +74,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     return AppScaffold(
       showLegalFooter: true,
       appBar: const AppAppBar(title: 'Thanh toán'),
+      // Nếu AppAppBar có hỗ trợ onBack, bạn có thể dùng:
+      // appBar: AppAppBar(title: 'Thanh toán', onBack: onBack),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -111,22 +133,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     context,
                     title: 'Thanh toán bằng Stripe (thẻ quốc tế)',
                     iconPath: '${CheckoutScreen._imgPath}/stripe.png',
-                    selected: state.selectedMethodId == 'stripe',
-                    onTap: () => notifier.selectMethod('stripe'),
+                    selected: subState.selectedMethodId == 'stripe',
+                    onTap: () => subNotifier.selectMethod('stripe'),
                   ),
                   _methodTile(
                     context,
                     title: 'Thanh toán bằng PayPal',
                     iconPath: '${CheckoutScreen._imgPath}/paypal.png',
-                    selected: state.selectedMethodId == 'paypal',
-                    onTap: () => notifier.selectMethod('paypal'),
+                    selected: subState.selectedMethodId == 'paypal',
+                    onTap: () => subNotifier.selectMethod('paypal'),
                   ),
                   _methodTile(
                     context,
                     title: 'Thanh toán bằng MoMo',
                     iconPath: '${CheckoutScreen._imgPath}/momo.png',
-                    selected: state.selectedMethodId == 'momo',
-                    onTap: () => notifier.selectMethod('momo'),
+                    selected: subState.selectedMethodId == 'momo',
+                    onTap: () => subNotifier.selectMethod('momo'),
                   ),
 
                   const SizedBox(height: 16),
@@ -135,11 +157,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     height: 48,
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _isPaying
+                      onPressed: isPaying
                           ? null
                           : () async {
                               // 1. Check method
-                              if (state.selectedMethodId == null) {
+                              if (subState.selectedMethodId == null) {
                                 messenger.showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -150,7 +172,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                 return;
                               }
 
-                              if (state.selectedMethodId != 'stripe') {
+                              if (subState.selectedMethodId != 'stripe') {
                                 messenger.showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -192,34 +214,32 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
                               final user = authState.user!;
 
-                              setState(() => _isPaying = true);
-
                               try {
-                                final repo = PaymentRepository(
-                                  PaymentService(),
+                                final controller = ref.read(
+                                  paymentControllerProvider.notifier,
                                 );
 
-                                // debug
+                                // DEBUG
                                 // ignore: avoid_print
                                 print(
                                   '[Checkout] Creating payment for plan: ${plan.name}',
                                 );
 
-                                final resp = await repo.createPayment(
-                                  userId: user.id,
-                                  email: user.email,
-                                  name:
-                                      "${user.firstName ?? ''} ${user.lastName ?? ''}"
-                                          .trim(),
-                                  stripeCustomerId: "",
-                                  plan: plan,
-                                  successUrl:
-                                      "fitaiplanning://payment/result/success",
-                                  cancelUrl:
-                                      "fitaiplanning://payment/result/failed",
-                                );
+                                final resp = await controller
+                                    .createPaymentSession(plan);
 
-                                // debug
+                                if (resp == null) {
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Không tạo được phiên thanh toán. Vui lòng thử lại.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                // DEBUG
                                 // ignore: avoid_print
                                 print(
                                   '[Checkout] sessionUrl = ${resp.sessionUrl}',
@@ -252,12 +272,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                                     ),
                                   ),
                                 );
-                              } finally {
-                                if (!mounted) return;
-                                setState(() => _isPaying = false);
                               }
                             },
-                      child: _isPaying
+                      child: isPaying
                           ? const SizedBox(
                               width: 18,
                               height: 18,
@@ -337,14 +354,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  String _money(int amount, String currency) {
-    if (currency.toUpperCase() == 'VND') {
-      final vnd = amount.toString().replaceAllMapped(
+  String _money(num amount, String currency) {
+    final upper = currency.toUpperCase();
+
+    if (upper == 'VND') {
+      final vndInt = amount.round();
+      final vnd = vndInt.toString().replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
       return '$vnd đ';
     }
-    return '$amount ${currency.toUpperCase()}';
+
+    final formatted = (amount is int)
+        ? amount.toString()
+        : amount.toStringAsFixed(2);
+
+    return '$formatted $upper';
   }
 }

@@ -24,6 +24,7 @@ class AppTextField extends StatefulWidget {
     this.textAlign,
     this.focusNode, // 👈 NEW
     this.inputFormatters, // 👈 NEW
+    this.textAlignVertical,
   });
 
   final TextEditingController? controller;
@@ -48,6 +49,7 @@ class AppTextField extends StatefulWidget {
   // 👇 thêm 2 tham số mới
   final FocusNode? focusNode;
   final List<TextInputFormatter>? inputFormatters;
+  final TextAlignVertical? textAlignVertical;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -81,6 +83,7 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       onFieldSubmitted: widget.onSubmitted,
       textAlign: widget.textAlign ?? TextAlign.start,
+      textAlignVertical: widget.textAlignVertical,
       focusNode: widget.focusNode, // 👈 dùng focusNode
       inputFormatters: widget.inputFormatters, // 👈 dùng formatters
       decoration:

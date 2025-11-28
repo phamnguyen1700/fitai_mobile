@@ -40,6 +40,7 @@ class SubscriptionGridCell extends StatelessWidget {
           ],
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min, // 👈 thêm
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Tên gói
@@ -74,7 +75,7 @@ class SubscriptionGridCell extends StatelessWidget {
 
             const SizedBox(height: 8),
 
-            // Features/desc ngắn (tùy backend, demo dùng description)
+            // Features
             ..._perksFor(product).map(
               (f) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
@@ -97,7 +98,7 @@ class SubscriptionGridCell extends StatelessWidget {
               ),
             ),
 
-            const Spacer(),
+            const SizedBox(height: 12), // 👈 thay cho Spacer()
 
             FilledButton(
               onPressed: onChoose,
@@ -146,16 +147,19 @@ class SubscriptionGridCell extends StatelessWidget {
     }
   }
 
-  static String _formatPrice(int amount, String currency) {
+  static String _formatPrice(num amount, String currency) {
     final cur = currency.toLowerCase();
     if (cur == 'vnd' || cur == 'vnđ' || cur == 'đ') {
-      final s = amount.toString().replaceAllMapped(
+      final vnd = amount.round().toString().replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
-      return '$sđ';
+      return '$vndđ';
     }
-    // đơn giản cho USD/EUR...
-    return '$amount ${currency.toUpperCase()}';
+    final formatted = (amount is int)
+        ? amount.toString()
+        : amount.toStringAsFixed(2);
+
+    return '$formatted ${currency.toUpperCase()}';
   }
 }

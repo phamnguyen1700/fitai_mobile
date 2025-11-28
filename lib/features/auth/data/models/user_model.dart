@@ -4,7 +4,7 @@ part 'user_model.g.dart';
 
 enum Gender { M, F }
 
-enum Goal { Weight_Loss, Weight_Gain, Maintain_Weight, Build_Muscle }
+enum Goal { Weight_Loss, Maintenance, Weight_Gain }
 
 /// Enum map 1–1 với backend
 enum ActivityLevel {
@@ -36,6 +36,13 @@ class UserModel {
 
   final String? message;
 
+  // 👇👇 Thêm ở đây (nhóm core / subscription)
+  @JsonKey(name: 'subscriptionProductName')
+  final String? subscriptionProductName;
+  // Nếu BE còn field khác (id, expiry...) thì thêm tiếp:
+  // @JsonKey(name: 'subscriptionProductId')
+  // final String? subscriptionProductId;
+
   // ——— Profile (camelCase) ———
   @JsonKey(name: 'firstName')
   final String? firstName;
@@ -65,7 +72,7 @@ class UserModel {
   @JsonKey(name: 'dateOfBirth', fromJson: _dateFromJson, toJson: _dateToJson)
   final DateTime? dateOfBirth;
 
-  @JsonKey(unknownEnumValue: Goal.Maintain_Weight)
+  @JsonKey(unknownEnumValue: Goal.Maintenance)
   final Goal? goal;
 
   @JsonKey(fromJson: _toDouble, toJson: _doubleToNum)
@@ -83,6 +90,7 @@ class UserModel {
     this.token,
     this.onboardingStep,
     this.message,
+    this.subscriptionProductName, // 👈 nhớ thêm vào constructor
     this.firstName,
     this.lastName,
     this.fullName,
@@ -112,6 +120,10 @@ class UserModel {
       'updatedAt': json['updatedAt'] ?? json['updated_at'],
       'dateOfBirth': json['dateOfBirth'] ?? json['date_of_birth'],
       'activityLevel': json['activityLevel'] ?? json['activity_level'],
+
+      // 👇 thêm normalize cho snake_case nếu BE dùng
+      'subscriptionProductName':
+          json['subscriptionProductName'] ?? json['subscription_product_name'],
     };
     return _$UserModelFromJson(normalized);
   }

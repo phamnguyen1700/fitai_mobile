@@ -1,6 +1,10 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/models/user_model.dart';
+import '../../data/models/auth_response.dart';
+
+// 👇 THÊM: import model subscription
+import '../../data/models/subscription_current_response.dart';
 
 part 'auth_providers.g.dart';
 
@@ -47,6 +51,66 @@ class AuthState {
 // ================== AUTH NOTIFIER ==================
 @riverpod
 class AuthNotifier extends _$AuthNotifier {
+  String _mapOtpError(String? message) {
+    if (message == null || message.isEmpty) {
+      return 'Mã OTP không hợp lệ.';
+    }
+
+    final lower = message.toLowerCase();
+    if (lower.contains('expire')) {
+      return 'Mã OTP đã hết hạn. Vui lòng yêu cầu mã mới.';
+    }
+    if (lower.contains('invalid')) {
+      return 'Mã OTP không đúng, hãy kiểm tra lại.';
+    }
+
+    return message;
+  }
+
+  // ------------------ CHANGE PASSWORD ------------------
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final current = state.value ?? const AuthState();
+
+    // bật loading, clear error cũ
+    state = AsyncValue.data(current.copyWith(isLoading: true, error: null));
+
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+
+      final response = await authRepository.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+
+      if (response.success) {
+        // ✅ Đổi mật khẩu OK: giữ nguyên user + isAuthenticated
+        state = AsyncValue.data(
+          current.copyWith(isLoading: false, error: null),
+        );
+        return true;
+      } else {
+        // ❌ BE trả success = false -> show message từ server
+        final rawMsg = response.message;
+        final friendlyMsg = rawMsg == 'Current password is incorrect'
+            ? 'Mật khẩu hiện tại không chính xác.'
+            : rawMsg;
+
+        state = AsyncValue.data(
+          current.copyWith(isLoading: false, error: friendlyMsg),
+        );
+        return false;
+      }
+    } catch (e) {
+      // lỗi khác (mạng, parse, v.v.)
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      state = AsyncValue.data(current.copyWith(isLoading: false, error: msg));
+      return false;
+    }
+  }
+
   @override
   Future<AuthState> build() async {
     final authRepository = ref.read(authRepositoryProvider);
@@ -76,7 +140,7 @@ class AuthNotifier extends _$AuthNotifier {
       );
 
       if (response.success) {
-        // LOGIN OK
+        // LOGIN OK -> set state đăng nhập
         state = AsyncValue.data(
           AuthState(
             isAuthenticated: true,
@@ -85,6 +149,9 @@ class AuthNotifier extends _$AuthNotifier {
             error: null,
           ),
         );
+
+        // 🔔 Sau khi login thành công -> load gói subscription hiện tại
+        await ref.read(subscriptionNotifierProvider.notifier).refresh();
       } else {
         // LOGIN FAIL
         state = AsyncValue.data(
@@ -133,11 +200,10 @@ class AuthNotifier extends _$AuthNotifier {
       );
 
       if (response.success) {
-        // Tuỳ BE: nếu register xong auto login thì để true,
-        // còn nếu đợi verify OTP mới cho login thì để false.
+        // Thường đợi verify OTP mới đăng nhập
         state = AsyncValue.data(
           AuthState(
-            isAuthenticated: false, // 👈 thường đợi verify OTP, nên để false
+            isAuthenticated: false,
             user: response.userData,
             isLoading: false,
             error: null,
@@ -149,7 +215,7 @@ class AuthNotifier extends _$AuthNotifier {
             isAuthenticated: false,
             user: null,
             isLoading: false,
-            error: response.message ?? 'Đăng ký thất bại. Vui lòng thử lại.',
+            error: response.message,
           ),
         );
       }
@@ -173,12 +239,12 @@ class AuthNotifier extends _$AuthNotifier {
     try {
       final authRepository = ref.read(authRepositoryProvider);
       await authRepository.logout();
+    } catch (_) {
+      // ignore
+    } finally {
+      // Clear subscription khi logout
+      ref.read(subscriptionNotifierProvider.notifier).clear();
 
-      state = const AsyncValue.data(
-        AuthState(isAuthenticated: false, user: null, isLoading: false),
-      );
-    } catch (e) {
-      // Dù logout fail (do server) vẫn clear local state
       state = const AsyncValue.data(
         AuthState(isAuthenticated: false, user: null, isLoading: false),
       );
@@ -209,12 +275,13 @@ class AuthNotifier extends _$AuthNotifier {
         return true;
       } else {
         // ❌ OTP sai
+        final mappedMessage = _mapOtpError(response.message);
         state = AsyncValue.data(
           AuthState(
             isAuthenticated: false,
             user: null,
             isLoading: false,
-            error: response.message ?? 'Mã OTP không hợp lệ.',
+            error: mappedMessage,
           ),
         );
         return false;
@@ -229,6 +296,24 @@ class AuthNotifier extends _$AuthNotifier {
         ),
       );
       return false;
+    }
+  }
+
+  Future<AuthResponse> resendOtp({required String email}) async {
+    final current = state.value ?? const AuthState();
+    state = AsyncValue.data(current.copyWith(isLoading: true));
+
+    try {
+      final authRepository = ref.read(authRepositoryProvider);
+      final response = await authRepository.resendOtp(email: email);
+
+      state = AsyncValue.data(current.copyWith(isLoading: false));
+      return response;
+    } catch (e) {
+      state = AsyncValue.data(
+        current.copyWith(isLoading: false, error: e.toString()),
+      );
+      return AuthResponse(success: false, message: e.toString());
     }
   }
 
@@ -249,6 +334,41 @@ class AuthNotifier extends _$AuthNotifier {
     if (current != null) {
       state = AsyncValue.data(current.copyWith(error: null));
     }
+  }
+}
+
+// ================== SUBSCRIPTION NOTIFIER ==================
+@riverpod
+class SubscriptionNotifier extends _$SubscriptionNotifier {
+  @override
+  Future<SubscriptionData?> build() async {
+    // Chỉ load khi có chỗ nào watch subscriptionNotifierProvider
+    // và user đã login.
+    final authRepo = ref.read(authRepositoryProvider);
+    try {
+      final res = await authRepo.getCurrentUserSubscription();
+      if (res.success) return res.data;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Gọi lại API lấy subscription hiện tại (dùng sau khi login)
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+
+    state = await AsyncValue.guard(() async {
+      final authRepo = ref.read(authRepositoryProvider);
+      final res = await authRepo.getCurrentUserSubscription();
+      if (res.success) return res.data;
+      return null;
+    });
+  }
+
+  /// Clear khi logout
+  void clear() {
+    state = const AsyncData(null);
   }
 }
 
@@ -291,4 +411,21 @@ String? authError(AuthErrorRef ref) {
     loading: () => null,
     error: (error, _) => error.toString(),
   );
+}
+
+// ---------- Convenience cho Subscription ----------
+@riverpod
+SubscriptionData? currentSubscription(CurrentSubscriptionRef ref) {
+  final subState = ref.watch(subscriptionNotifierProvider);
+  return subState.when(
+    data: (data) => data,
+    loading: () => null,
+    error: (_, __) => null,
+  );
+}
+
+@riverpod
+String? currentTierType(CurrentTierTypeRef ref) {
+  final sub = ref.watch(currentSubscriptionProvider);
+  return sub?.tierType;
 }

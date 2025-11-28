@@ -6,9 +6,28 @@ part of 'advisor_provider.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$advisorRepositoryHash() => r'6dfa99cb117edca44ddce1b54cec46e722a9b4c6';
+String _$advisorServiceHash() => r'bcec0f80f0c400c7824626ff54979a8fcae57e1b';
 
-/// Provider cho AdvisorRepository – dùng ở controller / UI
+/// Provider cho AdvisorService
+///
+/// Copied from [advisorService].
+@ProviderFor(advisorService)
+final advisorServiceProvider = AutoDisposeProvider<AdvisorService>.internal(
+  advisorService,
+  name: r'advisorServiceProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$advisorServiceHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef AdvisorServiceRef = AutoDisposeProviderRef<AdvisorService>;
+String _$advisorRepositoryHash() => r'd429dc34fb866482f75d3ec7034c502f82c4fa52';
+
+/// Provider cho AdvisorRepository – dùng để gán advisor, v.v.
 ///
 /// Copied from [advisorRepository].
 @ProviderFor(advisorRepository)
@@ -26,9 +45,9 @@ final advisorRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef AdvisorRepositoryRef = AutoDisposeProviderRef<AdvisorRepository>;
-String _$advisorsHash() => r'69fe2f6561dd41ed0bb81e41fff5ea085267765e';
+String _$advisorsHash() => r'b31fba00cc8bcc1f81b21a6db0ec7e47eebd0bf1';
 
-/// Provider load danh sách advisor (Future) – dùng trực tiếp ở UI nếu muốn
+/// Provider load danh sách advisor (Future) – dùng ở UI
 ///
 /// Copied from [advisors].
 @ProviderFor(advisors)

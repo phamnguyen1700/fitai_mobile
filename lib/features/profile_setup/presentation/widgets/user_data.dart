@@ -62,6 +62,52 @@ class ProfileDraft {
     goal: user.goal,
     activityLevel: user.activityLevel ?? ActivityLevel.Sedentary,
   );
+
+  ProfileDraft copyWith({
+    String? firstName,
+    String? lastName,
+    DateTime? dateOfBirth,
+    double? height,
+    double? weight,
+    Gender? gender,
+    Goal? goal,
+    ActivityLevel? activityLevel,
+    String? localPhotoPath,
+    String? frontBodyPhotoPath,
+    String? sideBodyPhotoPath,
+    int? mealsPerDay,
+    Set<String>? preferredIngredients,
+    Set<String>? avoidIngredients,
+    String? extraFoods,
+    String? cuisineType,
+    String? allergies,
+    bool clearFrontPhoto = false,
+    bool clearSidePhoto = false,
+  }) {
+    return ProfileDraft(
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      height: height ?? this.height,
+      weight: weight ?? this.weight,
+      gender: gender ?? this.gender,
+      goal: goal ?? this.goal,
+      activityLevel: activityLevel ?? this.activityLevel,
+      localPhotoPath: localPhotoPath ?? this.localPhotoPath,
+      frontBodyPhotoPath: clearFrontPhoto
+          ? null
+          : (frontBodyPhotoPath ?? this.frontBodyPhotoPath),
+      sideBodyPhotoPath: clearSidePhoto
+          ? null
+          : (sideBodyPhotoPath ?? this.sideBodyPhotoPath),
+      mealsPerDay: mealsPerDay ?? this.mealsPerDay,
+      preferredIngredients: preferredIngredients ?? this.preferredIngredients,
+      avoidIngredients: avoidIngredients ?? this.avoidIngredients,
+      extraFoods: extraFoods ?? this.extraFoods,
+      cuisineType: cuisineType ?? this.cuisineType,
+      allergies: allergies ?? this.allergies,
+    );
+  }
 }
 
 extension ProfileDraftDietDto on ProfileDraft {
@@ -71,11 +117,11 @@ extension ProfileDraftDietDto on ProfileDraft {
     'allergies': allergies ?? '',
     'preferredIngredients': preferredIngredients.isNotEmpty
         ? preferredIngredients.join(', ')
-        : null,
+        : '',
     'avoidIngredients': avoidIngredients.isNotEmpty
         ? avoidIngredients.join(', ')
-        : null,
-    'notes': extraFoods,
+        : '',
+    'notes': extraFoods ?? '',
   }..removeWhere((_, v) => v == null);
 }
 
@@ -181,6 +227,93 @@ class AppContinueButton extends StatelessWidget {
   }
 }
 
+/// =====================
+/// Ideal weight helper
+/// =====================
+
+class IdealWeightRange {
+  final double min;
+  final double max;
+  const IdealWeightRange(this.min, this.max);
+}
+
+class _IdealRow {
+  final int heightCm;
+  final double min;
+  final double max;
+  const _IdealRow(this.heightCm, this.min, this.max);
+}
+
+/// Bảng nữ trưởng thành
+const List<_IdealRow> _femaleIdealTable = [
+  _IdealRow(135, 30, 34),
+  _IdealRow(137, 30, 37),
+  _IdealRow(140, 30, 37),
+  _IdealRow(142, 32, 40),
+  _IdealRow(144, 35, 42),
+  _IdealRow(147, 36, 45),
+  _IdealRow(150, 39, 47),
+  _IdealRow(152, 40, 50),
+  _IdealRow(155, 43, 52),
+  _IdealRow(157, 45, 55),
+  _IdealRow(160, 47, 57),
+  _IdealRow(162, 49, 60),
+  _IdealRow(165, 51, 62),
+  _IdealRow(168, 53, 65),
+  _IdealRow(170, 55, 67),
+  _IdealRow(173, 57, 70),
+  _IdealRow(175, 59, 72),
+  _IdealRow(178, 61, 75),
+  _IdealRow(180, 63, 77),
+  _IdealRow(183, 65, 80),
+];
+
+/// Bảng nam trưởng thành
+const List<_IdealRow> _maleIdealTable = [
+  _IdealRow(135, 30, 39),
+  _IdealRow(137, 32, 39),
+  _IdealRow(140, 30, 39),
+  _IdealRow(142, 33, 40),
+  _IdealRow(144, 35, 44),
+  _IdealRow(147, 38, 46),
+  _IdealRow(150, 40, 50),
+  _IdealRow(152, 43, 53),
+  _IdealRow(155, 45, 55),
+  _IdealRow(157, 48, 59),
+  _IdealRow(160, 50, 61),
+  _IdealRow(162, 53, 65),
+  _IdealRow(165, 56, 68),
+  _IdealRow(168, 58, 70),
+  _IdealRow(170, 60, 74),
+  _IdealRow(173, 63, 76),
+  _IdealRow(175, 65, 80),
+  _IdealRow(178, 63, 83),
+  _IdealRow(180, 70, 85),
+  _IdealRow(183, 72, 89),
+];
+
+IdealWeightRange? getIdealWeightRange({
+  required double heightCm,
+  required Gender gender,
+}) {
+  final table = gender == Gender.F ? _femaleIdealTable : _maleIdealTable;
+  if (table.isEmpty) return null;
+
+  // chọn dòng có chiều cao gần nhất
+  _IdealRow closest = table.first;
+  double bestDiff = (heightCm - closest.heightCm).abs();
+
+  for (final row in table.skip(1)) {
+    final diff = (heightCm - row.heightCm).abs();
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      closest = row;
+    }
+  }
+
+  return IdealWeightRange(closest.min, closest.max);
+}
+
 // STEP 1 – Tổng quan (full DTO)
 class UserDataFormCard extends StatefulWidget {
   const UserDataFormCard({
@@ -212,6 +345,72 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
   ActivityLevel _activityLevel = ActivityLevel.Sedentary;
   DateTime? _dob;
 
+  String? _goalError;
+
+  bool _hasValidHeightAndWeight() {
+    final h = double.tryParse(_hCtl.text.replaceAll(',', '.'));
+    final w = double.tryParse(_wCtl.text.replaceAll(',', '.'));
+    return h != null && w != null && h > 0 && w > 0;
+  }
+
+  bool _isUnderweightForHeight() {
+    final h = double.tryParse(_hCtl.text.replaceAll(',', '.'));
+    final w = double.tryParse(_wCtl.text.replaceAll(',', '.'));
+    if (h == null || w == null) return false;
+    if (_gender == null) return false;
+
+    final range = getIdealWeightRange(heightCm: h, gender: _gender!);
+    if (range == null) return false;
+
+    return w < range.min;
+  }
+
+  void _recheckGoal() {
+    // Nếu chưa có chiều cao/cân nặng hợp lệ -> reset goal về null
+    if (!_hasValidHeightAndWeight()) {
+      if (_goal != null || _goalError != null) {
+        setState(() {
+          _goal = null;
+          _goalError = null;
+        });
+      }
+      return;
+    }
+
+    if (_goal == Goal.Weight_Loss) {
+      final h = double.tryParse(_hCtl.text.replaceAll(',', '.'));
+      final w = double.tryParse(_wCtl.text.replaceAll(',', '.'));
+
+      // Nếu không parse được hoặc chưa nhập đủ, không hiển thị lỗi
+      if (h == null || w == null || _gender == null) {
+        if (_goalError != null) {
+          setState(() => _goalError = null);
+        }
+        return;
+      }
+
+      // Nếu parse được và còn underweight -> hiển thị lỗi
+      if (_isUnderweightForHeight()) {
+        setState(() {
+          _goalError = 'Bạn đang nhẹ cân, không nên đặt mục tiêu giảm cân.';
+        });
+      } else {
+        // Không còn underweight -> clear lỗi và reset dropdown về null
+        if (_goalError != null || _goal == Goal.Weight_Loss) {
+          setState(() {
+            _goalError = null;
+            _goal = null; // Reset dropdown về trạng thái chưa chọn
+          });
+        }
+      }
+    } else {
+      // Không phải mục tiêu giảm cân -> clear lỗi nếu có
+      if (_goalError != null) {
+        setState(() => _goalError = null);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -227,13 +426,25 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
     _dobCtl = TextEditingController(
       text: _dob != null ? _formatDate(_dob!) : '',
     );
-    _gender = widget.initial.gender ?? Gender.M;
+    _gender = widget.initial.gender;
     _goal = widget.initial.goal;
     _activityLevel = widget.initial.activityLevel ?? ActivityLevel.Sedentary;
+
+    _hCtl.addListener(() {
+      _recheckGoal();
+      setState(() {});
+    });
+
+    _wCtl.addListener(() {
+      _recheckGoal();
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
+    _hCtl.removeListener(_recheckGoal);
+    _wCtl.removeListener(_recheckGoal);
     _firstNameCtl.dispose();
     _lastNameCtl.dispose();
     _hCtl.dispose();
@@ -338,18 +549,57 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
                     labelText: 'Cân nặng (kg)',
                     hintText: 'Nhập cân nặng (kg)',
                   ),
-                  validator: (v) => _numReq(v, min: 25, max: 300),
+                  validator: (v) => _numReq(v, max: 200),
                 ),
                 const SizedBox(height: 16),
 
                 _GenderSelector(
-                  value: _gender ?? Gender.M,
-                  onChanged: (g) => setState(() => _gender = g),
+                  value: _gender,
+                  enabled: _hasValidHeightAndWeight(),
+                  onChanged: (g) {
+                    setState(() {
+                      _gender = g;
+                    });
+                    _recheckGoal();
+                  },
                 ),
                 const SizedBox(height: 12),
                 _GoalDropdown(
                   value: _goal,
-                  onChanged: (g) => setState(() => _goal = g),
+                  errorText: _goalError,
+                  enabled: _hasValidHeightAndWeight(),
+                  onChanged: (g) {
+                    if (g == null) return;
+
+                    // chỉ bắt case giảm cân
+                    if (g == Goal.Weight_Loss && _isUnderweightForHeight()) {
+                      final h = double.tryParse(
+                        _hCtl.text.replaceAll(',', '.'),
+                      );
+                      final gender = _gender ?? Gender.M;
+                      final range = (h != null)
+                          ? getIdealWeightRange(heightCm: h, gender: gender)
+                          : null;
+
+                      final msg = range == null
+                          ? 'Bạn đang nhẹ cân so với chiều cao, không nên đặt mục tiêu giảm cân.'
+                          : 'Bạn đang nhẹ hơn khoảng cân nặng lý tưởng '
+                                '(${range.min.round()}–${range.max.round()} kg) cho chiều cao hiện tại. '
+                                'Hãy chọn tăng cân / tăng cơ hoặc duy trì cân nặng.';
+
+                      setState(() {
+                        _goal = g;
+                        _goalError = msg;
+                      });
+                      return;
+                    }
+
+                    // chọn mục tiêu hợp lệ → clear lỗi
+                    setState(() {
+                      _goal = g;
+                      _goalError = null;
+                    });
+                  },
                 ),
                 const SizedBox(height: 12),
                 _ActivityLevelDropdown(
@@ -363,14 +613,37 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
         ),
         AppContinueButton(
           onPressed: () {
+            // Nếu đang chọn giảm cân và nhẹ cân thì báo lỗi, không cho qua
+            if (_goal == Goal.Weight_Loss && _isUnderweightForHeight()) {
+              final h = double.tryParse(_hCtl.text.replaceAll(',', '.'));
+              final gender = _gender ?? Gender.M;
+              final range = (h != null)
+                  ? getIdealWeightRange(heightCm: h, gender: gender)
+                  : null;
+
+              final msg = range == null
+                  ? 'Bạn đang nhẹ cân so với chiều cao, không nên đặt mục tiêu giảm cân.'
+                  : 'Bạn đang nhẹ hơn khoảng cân nặng lý tưởng '
+                        '(${range.min.round()}–${range.max.round()} kg). '
+                        'Hãy chọn tăng cân / tăng cơ hoặc duy trì cân nặng.';
+
+              setState(() {
+                _goalError = msg;
+              });
+              return;
+            }
+
             if (!(_formKey.currentState?.validate() ?? false)) return;
+
+            final heightVal = double.parse(_hCtl.text.replaceAll(',', '.'));
+            final weightVal = double.parse(_wCtl.text.replaceAll(',', '.'));
 
             final draft = widget.initial
               ..firstName = _firstNameCtl.text.trim()
               ..lastName = _lastNameCtl.text.trim()
               ..dateOfBirth = _dob
-              ..height = double.parse(_hCtl.text.replaceAll(',', '.'))
-              ..weight = double.parse(_wCtl.text.replaceAll(',', '.'))
+              ..height = heightVal
+              ..weight = weightVal
               ..gender = _gender
               ..goal = _goal
               ..activityLevel = _activityLevel;
@@ -384,52 +657,75 @@ class _UserDataFormCardState extends State<UserDataFormCard> {
 }
 
 class _GenderSelector extends StatelessWidget {
-  const _GenderSelector({required this.value, required this.onChanged});
-  final Gender value;
-  final ValueChanged<Gender> onChanged;
+  const _GenderSelector({
+    this.value,
+    required this.onChanged,
+    this.enabled = true,
+  });
+  final Gender? value;
+  final ValueChanged<Gender?> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const SizedBox(width: 12),
-        ChoiceChip(
-          selected: value == Gender.M,
-          label: const Text('Nam'),
-          onSelected: (_) => onChanged(Gender.M),
-        ),
-        const SizedBox(width: 8),
-        ChoiceChip(
-          selected: value == Gender.F,
-          label: const Text('Nữ'),
-          onSelected: (_) => onChanged(Gender.F),
-        ),
+    return DropdownButtonFormField<Gender>(
+      value: value,
+      isExpanded: true,
+      decoration: const InputDecoration(labelText: 'Giới tính'),
+      items: const [
+        DropdownMenuItem(value: Gender.M, child: Text('Nam')),
+        DropdownMenuItem(value: Gender.F, child: Text('Nữ')),
       ],
+      onChanged: enabled ? onChanged : null,
+      validator: (v) {
+        if (v == null) return 'Chọn giới tính';
+        return null;
+      },
     );
   }
 }
 
 class _GoalDropdown extends StatelessWidget {
-  const _GoalDropdown({this.value, required this.onChanged});
+  const _GoalDropdown({
+    this.value,
+    required this.onChanged,
+    this.errorText,
+    this.enabled = true,
+  });
+
   final Goal? value;
   final ValueChanged<Goal?> onChanged;
+  final String? errorText;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<Goal>(
       value: value,
-      decoration: const InputDecoration(labelText: 'Mục tiêu'),
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: 'Mục tiêu',
+        errorText: errorText, // 👈 hiện text đỏ dưới dropdown
+      ),
       items: const [
         DropdownMenuItem(
           value: Goal.Weight_Loss,
-          child: Text('Giảm mỡ / Giảm cân'),
+          child: Text('Giảm cân / Giảm mỡ'),
         ),
-        DropdownMenuItem(value: Goal.Maintain_Weight, child: Text('Giữ cân')),
-        DropdownMenuItem(value: Goal.Weight_Gain, child: Text('Tăng cân')),
-        DropdownMenuItem(value: Goal.Build_Muscle, child: Text('Tăng cơ')),
+        DropdownMenuItem(
+          value: Goal.Maintenance,
+          child: Text('Duy trì cân nặng / Giảm mỡ'),
+        ),
+        DropdownMenuItem(
+          value: Goal.Weight_Gain,
+          child: Text('Tăng cân / Tăng cơ'),
+        ),
       ],
-      onChanged: onChanged,
-      validator: (v) => v == null ? 'Chọn mục tiêu' : null,
+      onChanged: enabled ? onChanged : null,
+      validator: (v) {
+        if (v == null) return 'Chọn mục tiêu';
+        return null;
+      },
     );
   }
 }
@@ -518,12 +814,38 @@ class BodyUploadCard extends StatelessWidget {
     required this.onContinue,
     this.frontImagePath,
     this.sideImagePath,
+    this.bodygramError,
+    this.isLoading = false,
   });
 
   final Future<void> Function() onScanByCamera;
   final VoidCallback onContinue;
   final String? frontImagePath;
   final String? sideImagePath;
+  final String? bodygramError;
+  final bool isLoading;
+
+  Widget _buildLoadingSection(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          'Đang gửi dữ liệu Bodygram để AI phân tích...',
+          style: t.bodyMedium?.copyWith(color: cs.primary),
+        ),
+        const SizedBox(height: 10),
+        LinearProgressIndicator(
+          backgroundColor: cs.primary.withOpacity(0.15),
+          valueColor: AlwaysStoppedAnimation(cs.primary),
+          minHeight: 4,
+        ),
+        const SizedBox(height: 4),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -532,6 +854,12 @@ class BodyUploadCard extends StatelessWidget {
     final hasSide = sideImagePath != null && sideImagePath!.isNotEmpty;
     final allDone = hasFront && hasSide;
     final hasAny = hasFront || hasSide;
+
+    // Debug: log paths
+    debugPrint(
+      '[BodyUploadCard] frontPath: $frontImagePath, sidePath: $sideImagePath',
+    );
+    debugPrint('[BodyUploadCard] hasFront: $hasFront, hasSide: $hasSide');
 
     return Column(
       children: [
@@ -542,64 +870,98 @@ class BodyUploadCard extends StatelessWidget {
         ),
 
         // =============================
-        // Chỉ hiện "Tư thế chính xác" KHI CHƯA CÓ ẢNH NÀO
+        // Hiển thị ảnh hướng dẫn hoặc ảnh thực tế
         // =============================
-        if (!hasAny)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'lib/core/assets/images/front.png',
-                              height: 180,
-                              fit: BoxFit.contain,
-                            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: hasFront
+                              ? Image.file(
+                                  File(frontImagePath!),
+                                  height: 180,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    debugPrint(
+                                      '[BodyUploadCard] Error loading front image: $error',
+                                    );
+                                    return Image.asset(
+                                      'lib/core/assets/images/front.png',
+                                      height: 180,
+                                      fit: BoxFit.contain,
+                                    );
+                                  },
+                                )
+                              : Image.asset(
+                                  'lib/core/assets/images/front.png',
+                                  height: 180,
+                                  fit: BoxFit.contain,
+                                ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Chính diện',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: hasFront ? cs.primary : null,
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Chính diện',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              'lib/core/assets/images/right.png',
-                              height: 180,
-                              fit: BoxFit.contain,
-                            ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: hasSide
+                              ? Image.file(
+                                  File(sideImagePath!),
+                                  height: 180,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    debugPrint(
+                                      '[BodyUploadCard] Error loading side image: $error',
+                                    );
+                                    return Image.asset(
+                                      'lib/core/assets/images/right.png',
+                                      height: 180,
+                                      fit: BoxFit.contain,
+                                    );
+                                  },
+                                )
+                              : Image.asset(
+                                  'lib/core/assets/images/right.png',
+                                  height: 180,
+                                  fit: BoxFit.contain,
+                                ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Mặt cạnh',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: hasSide ? cs.primary : null,
                           ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Bên hông',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
+              ),
+              if (!hasAny) ...[
                 const SizedBox(height: 4),
                 const Center(
                   child: Text(
@@ -608,170 +970,91 @@ class BodyUploadCard extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
+            ],
           ),
-
-        // =============================
-        // SectionCard preview ẢNH THẬT – CHỈ HIỆN KHI ĐÃ CHỤP ÍT NHẤT 1 ẢNH
-        // =============================
-        if (hasAny)
-          SectionCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _BodyPreviewBox(
-                        label: 'Chính diện',
-                        path: frontImagePath,
-                        isDone: hasFront,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _BodyPreviewBox(
-                        label: 'Bên hông',
-                        path: sideImagePath,
-                        isDone: hasSide,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onScanByCamera,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    label: const Text('Quét lại dữ liệu cơ thể'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Ảnh chỉ dùng để phân tích cơ thể, sẽ không công khai.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-
-        // =============================
-        // NÚT QUÉT khi chưa có ảnh (đặt ngoài SectionCard)
-        // =============================
-        if (!hasAny)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FilledButton.icon(
-                  onPressed: onScanByCamera,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Quét dữ liệu cơ thể'),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Ảnh của bạn sẽ được bảo mật.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-
-        AppContinueButton(
-          onPressed: () {
-            if (allDone) {
-              onContinue();
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    'Bạn cần có đủ 2 ảnh (chính diện và bên hông) trước khi tiếp tục.',
-                  ),
-                ),
-              );
-            }
-          },
         ),
-      ],
-    );
-  }
-}
 
-class _BodyPreviewBox extends StatelessWidget {
-  const _BodyPreviewBox({
-    required this.label,
-    required this.path,
-    required this.isDone,
-  });
-
-  final String label;
-  final String? path;
-  final bool isDone;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    return AspectRatio(
-      aspectRatio: 3 / 4,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDone ? cs.primary : cs.outlineVariant,
-            width: 1.2,
-          ),
-          color: cs.surfaceVariant.withOpacity(0.15),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            if (path != null && path!.isNotEmpty)
-              Positioned.fill(child: Image.file(File(path!), fit: BoxFit.cover))
-            else
-              Center(
-                child: Icon(
-                  Icons.person_outline,
-                  size: 40,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-            Positioned(
-              left: 8,
-              bottom: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        // =============================
+        // NÚT QUÉT
+        // =============================
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: BorderRadius.circular(999),
+                  color: cs.surfaceContainerHighest.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      isDone ? Icons.check_circle : Icons.camera_alt_outlined,
-                      size: 14,
-                      color: isDone ? Colors.greenAccent : Colors.white,
-                    ),
-                    const SizedBox(width: 4),
                     Text(
-                      label,
-                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                      'Hướng dẫn chụp:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '• Đứng thẳng, toàn thân nằm trong khung hình.\n'
+                      '• Ánh sáng đủ, nền phía sau đơn giản.\n'
+                      '• Mặc đồ ôm vừa, không quá rộng.',
+                      style: TextStyle(fontSize: 12),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+              hasAny
+                  ? OutlinedButton.icon(
+                      onPressed: isLoading ? null : onScanByCamera,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Quét lại dữ liệu cơ thể'),
+                    )
+                  : OutlinedButton.icon(
+                      onPressed: isLoading ? null : onScanByCamera,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Quét dữ liệu cơ thể'),
+                    ),
+              const SizedBox(height: 8),
+              if (bodygramError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  bodygramError!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
+
+        if (isLoading)
+          _buildLoadingSection(context)
+        else
+          AppContinueButton(
+            onPressed: () {
+              if (allDone) {
+                onContinue();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Bạn cần có đủ 2 ảnh (chính diện và bên hông) trước khi tiếp tục.',
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+      ],
     );
   }
 }
@@ -916,28 +1199,60 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
 
   @override
   Widget build(BuildContext context) {
-    final proteinList = <String>[
-      'Thịt gà', 'Thịt bò', 'Thịt heo', 'Cá hồi', 'Cá ngừ', 'Tôm', 'Trứng',
-      'Đậu giàu protein', // đổi từ "Đậu nành" -> mô tả đúng hơn
-    ];
+    final isVeg = _cuisineCtl.text == 'Chay';
 
-    final carbList = <String>[
-      'Gạo',
-      'Yến mạch',
-      'Khoai lang',
-      'Bánh mì nguyên cám',
-      'Chuối',
-      'Dưa hấu',
-      'Đậu giàu tinh bột',
-    ];
+    // Nguồn đạm theo chế độ ăn
+    final proteinList = isVeg
+        ? <String>[
+            'Đậu hũ',
+            'Tempeh',
+            'Seitan',
+            'Đậu nành',
+            'Đậu gà',
+            'Đậu lăng',
+            'Edamame',
+            'Sữa hạt tăng cường protein',
+          ]
+        : <String>[
+            'Thịt gà',
+            'Thịt bò',
+            'Thịt heo',
+            'Cá hồi',
+            'Cá ngừ',
+            'Tôm',
+            'Trứng',
+            'Đậu giàu protein',
+          ];
 
-    final fatList = <String>[
-      'Đậu giàu chất béo',
-      'Dầu ô liu',
-      'Hạt óc chó',
-      'Hạnh nhân',
-      'Bơ (avocado)',
-    ];
+    // Nguồn tinh bột theo chế độ ăn
+    final carbList = isVeg
+        ? <String>['Yến mạch', 'Quinoa', 'Khoai', 'Gạo lứt', 'Bắp', 'Trái cây']
+        : <String>[
+            'Gạo',
+            'Yến mạch',
+            'Khoai lang',
+            'Bánh mì nguyên cám',
+            'Chuối',
+            'Dưa hấu',
+            'Đậu giàu tinh bột',
+          ];
+
+    // Nguồn chất béo theo chế độ ăn
+    final fatList = isVeg
+        ? <String>[
+            'Các loại hạt',
+            'Mè, hạt lanh, chia',
+            'Bơ đậu phộng',
+            'Bơ/avocado',
+            'Dầu oliu',
+          ]
+        : <String>[
+            'Đậu giàu chất béo',
+            'Dầu ô liu',
+            'Hạt óc chó',
+            'Hạnh nhân',
+            'Bơ (avocado)',
+          ];
 
     final fiberList = <String>[
       'Rau lá xanh',
@@ -949,17 +1264,7 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
       'Rau trộn',
     ];
 
-    final allItems = <String>{
-      ...proteinList,
-      ...carbList,
-      ...fatList,
-      ...fiberList,
-      ..._customProteins,
-      ..._customCarbs,
-      ..._customFats,
-      ..._customFibers,
-    };
-    final dietOptions = ['Bình thường', 'Chay', 'Keto'];
+    final dietOptions = ['Bình thường', 'Chay'];
 
     String? joinOrNull(Set<String> s) {
       final xs = s.map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
@@ -1007,23 +1312,7 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                   );
                 }).toList(),
               ),
-
-              const SizedBox(height: 4),
-              TextField(
-                controller: _allergyCtl,
-                decoration: const InputDecoration(
-                  labelText: 'Dị ứng với thực phẩm',
-                  hintText: 'Ví dụ: Hải sản, đậu phộng...',
-                  border: UnderlineInputBorder(), // ✅ thêm underline
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 4,
-                  ),
-                ),
-              ),
               const SizedBox(height: 8),
-
               // ===== Nguồn đạm =====
               const Text(
                 'Nguồn đạm',
@@ -1132,34 +1421,14 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                 targetBucket: _customFibers,
               ),
               const Divider(height: 8),
-              Text(
-                'Không ăn được',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Dị ứng', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 8),
               TextField(
-                controller: _avoidCtl,
-                maxLines: 2,
+                controller: _allergyCtl,
                 decoration: const InputDecoration(
-                  labelText: 'Không ăn được',
-                  hintText: 'Ví dụ: Tôm, đậu phộng, hành...',
-                  border: UnderlineInputBorder(), // ✅ dùng cùng style
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
-                    vertical: 8,
-                    horizontal: 4,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-              TextField(
-                controller: _extraCtl,
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú thêm',
-                  hintText:
-                      'Ví dụ: Thích ăn sáng nhẹ, không ăn cay, ít dầu mỡ...',
-                  border: UnderlineInputBorder(), // ✅ đồng nhất
+                  labelText: 'Dị ứng với thực phẩm',
+                  hintText: 'Ví dụ: Hải sản, đậu phộng...',
+                  border: UnderlineInputBorder(),
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(
                     vertical: 8,
@@ -1173,6 +1442,14 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
         AppContinueButton(
           label: 'Hoàn tất hồ sơ',
           onPressed: () {
+            // parse avoid
+            final avoidSet = _parseFreeTextToSet(_avoidCtl.text);
+            final avoidStr = avoidSet.isEmpty ? '' : avoidSet.join(', '); // 👈
+
+            // notes
+            final notesText = _extraCtl.text.trim();
+            final notesValue = notesText.isEmpty ? '' : notesText; // 👈
+
             final req = DietaryPreferenceRequest(
               mealsPerDay: _meals,
               cuisineType: _cuisineCtl.text.trim().isEmpty
@@ -1180,16 +1457,14 @@ class _DietPrefsFormCardState extends State<DietPrefsFormCard> {
                   : _cuisineCtl.text.trim(),
               allergies: _allergyCtl.text.trim().isEmpty
                   ? ''
-                  : _allergyCtl.text.trim(),
+                  : _allergyCtl.text.trim(), // ✅ đã đúng
               preferredIngredients: joinOrNull(_preferred),
-              avoidIngredients: joinOrNull(_parseFreeTextToSet(_avoidCtl.text)),
-              notes: _extraCtl.text.trim().isEmpty
-                  ? null
-                  : _extraCtl.text.trim(),
+              avoidIngredients: avoidStr, // 👈 luôn truyền string
+              notes: notesValue, // 👈 luôn truyền string
             );
 
             debugPrint('[Diet] Request: ${req.toJson()}');
-            widget.onSubmit(req); // ✅ trả thẳng request
+            widget.onSubmit(req);
           },
         ),
       ],
@@ -1211,24 +1486,59 @@ class _Stepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        IconButton.filledTonal(
-          onPressed: value > min ? () => onChanged(value - 1) : null,
-          icon: const Icon(Icons.remove),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            '$value',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+    final cs = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: cs.outline),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Nút trừ
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: value > min ? () => onChanged(value - 1) : null,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: value > min
+                    ? cs.primary.withOpacity(0.08)
+                    : Colors.transparent,
+              ),
+              child: Icon(
+                Icons.remove,
+                size: 18,
+                color: value > min ? cs.primary : cs.outline,
+              ),
+            ),
           ),
-        ),
-        IconButton.filled(
-          onPressed: value < max ? () => onChanged(value + 1) : null,
-          icon: const Icon(Icons.add),
-        ),
-      ],
+          const SizedBox(width: 12),
+          // Số bữa
+          Text(
+            '$value',
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+          ),
+          const SizedBox(width: 12),
+          // Nút cộng
+          InkWell(
+            borderRadius: BorderRadius.circular(999),
+            onTap: value < max ? () => onChanged(value + 1) : null,
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: value < max ? cs.primary : cs.primary,
+              ),
+              child: Icon(Icons.add, size: 18, color: cs.onPrimary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

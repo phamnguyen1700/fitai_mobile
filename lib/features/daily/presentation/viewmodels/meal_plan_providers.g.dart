@@ -27,7 +27,7 @@ final mealPlanRepositoryProvider =
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
 typedef MealPlanRepositoryRef = AutoDisposeProviderRef<MealPlanRepository>;
-String _$dailyMealsHash() => r'702ab3c235abfd3bc4566f9ffa87b48de5511e72';
+String _$dailyMealsHash() => r'ac5e26234e0c3bccc119f8afdcfd5facb1bd0e6a';
 
 /// Copied from Dart SDK
 class _SystemHash {
@@ -50,16 +50,32 @@ class _SystemHash {
   }
 }
 
-/// See also [dailyMeals].
+/// ===============================
+/// FETCH DAILY MEALS (result full)
+/// ===============================
+///
+/// Copied from [dailyMeals].
 @ProviderFor(dailyMeals)
 const dailyMealsProvider = DailyMealsFamily();
 
-/// See also [dailyMeals].
-class DailyMealsFamily extends Family<AsyncValue<MealDayData>> {
-  /// See also [dailyMeals].
+/// ===============================
+/// FETCH DAILY MEALS (result full)
+/// ===============================
+///
+/// Copied from [dailyMeals].
+class DailyMealsFamily extends Family<AsyncValue<MealPlanResult>> {
+  /// ===============================
+  /// FETCH DAILY MEALS (result full)
+  /// ===============================
+  ///
+  /// Copied from [dailyMeals].
   const DailyMealsFamily();
 
-  /// See also [dailyMeals].
+  /// ===============================
+  /// FETCH DAILY MEALS (result full)
+  /// ===============================
+  ///
+  /// Copied from [dailyMeals].
   DailyMealsProvider call(int dayNumber) {
     return DailyMealsProvider(dayNumber);
   }
@@ -86,9 +102,17 @@ class DailyMealsFamily extends Family<AsyncValue<MealDayData>> {
   String? get name => r'dailyMealsProvider';
 }
 
-/// See also [dailyMeals].
-class DailyMealsProvider extends AutoDisposeFutureProvider<MealDayData> {
-  /// See also [dailyMeals].
+/// ===============================
+/// FETCH DAILY MEALS (result full)
+/// ===============================
+///
+/// Copied from [dailyMeals].
+class DailyMealsProvider extends AutoDisposeFutureProvider<MealPlanResult> {
+  /// ===============================
+  /// FETCH DAILY MEALS (result full)
+  /// ===============================
+  ///
+  /// Copied from [dailyMeals].
   DailyMealsProvider(int dayNumber)
     : this._internal(
         (ref) => dailyMeals(ref as DailyMealsRef, dayNumber),
@@ -116,7 +140,7 @@ class DailyMealsProvider extends AutoDisposeFutureProvider<MealDayData> {
 
   @override
   Override overrideWith(
-    FutureOr<MealDayData> Function(DailyMealsRef provider) create,
+    FutureOr<MealPlanResult> Function(DailyMealsRef provider) create,
   ) {
     return ProviderOverride(
       origin: this,
@@ -133,7 +157,7 @@ class DailyMealsProvider extends AutoDisposeFutureProvider<MealDayData> {
   }
 
   @override
-  AutoDisposeFutureProviderElement<MealDayData> createElement() {
+  AutoDisposeFutureProviderElement<MealPlanResult> createElement() {
     return _DailyMealsProviderElement(this);
   }
 
@@ -153,13 +177,13 @@ class DailyMealsProvider extends AutoDisposeFutureProvider<MealDayData> {
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-mixin DailyMealsRef on AutoDisposeFutureProviderRef<MealDayData> {
+mixin DailyMealsRef on AutoDisposeFutureProviderRef<MealPlanResult> {
   /// The parameter `dayNumber` of this provider.
   int get dayNumber;
 }
 
 class _DailyMealsProviderElement
-    extends AutoDisposeFutureProviderElement<MealDayData>
+    extends AutoDisposeFutureProviderElement<MealPlanResult>
     with DailyMealsRef {
   _DailyMealsProviderElement(super.provider);
 
@@ -167,11 +191,15 @@ class _DailyMealsProviderElement
   int get dayNumber => (origin as DailyMealsProvider).dayNumber;
 }
 
-String _$todayMealsHash() => r'f1a94b36bf8c17deaecb97c8697d9731637930e0';
+String _$todayMealsHash() => r'3601511d47d69fe10b51b137f47404d6c4c270fe';
 
-/// See also [todayMeals].
+/// ===============================
+/// TODAY MEALS (theo currentDay)
+/// ===============================
+///
+/// Copied from [todayMeals].
 @ProviderFor(todayMeals)
-final todayMealsProvider = AutoDisposeFutureProvider<MealDayData>.internal(
+final todayMealsProvider = AutoDisposeFutureProvider<MealPlanResult>.internal(
   todayMeals,
   name: r'todayMealsProvider',
   debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
@@ -183,10 +211,36 @@ final todayMealsProvider = AutoDisposeFutureProvider<MealDayData>.internal(
 
 @Deprecated('Will be removed in 3.0. Use Ref instead')
 // ignore: unused_element
-typedef TodayMealsRef = AutoDisposeFutureProviderRef<MealDayData>;
+typedef TodayMealsRef = AutoDisposeFutureProviderRef<MealPlanResult>;
+String _$mealPlanStatusHash() => r'3cdaedeef0f98c9e8b9cdaec271ceed302e32c9e';
+
+/// ======================================
+/// STATUS PROVIDER — để OnboardingGate bắt
+/// ======================================
+/// trả về: 'has_plan' | 'no_plan' | 'error' | 'loading'
+///
+/// Copied from [mealPlanStatus].
+@ProviderFor(mealPlanStatus)
+final mealPlanStatusProvider = AutoDisposeProvider<String>.internal(
+  mealPlanStatus,
+  name: r'mealPlanStatusProvider',
+  debugGetCreateSourceHash: const bool.fromEnvironment('dart.vm.product')
+      ? null
+      : _$mealPlanStatusHash,
+  dependencies: null,
+  allTransitiveDependencies: null,
+);
+
+@Deprecated('Will be removed in 3.0. Use Ref instead')
+// ignore: unused_element
+typedef MealPlanStatusRef = AutoDisposeProviderRef<String>;
 String _$currentDayHash() => r'6d0c5a6ecb6baa3bab0f6231455b17e1426ef22b';
 
-/// See also [CurrentDay].
+/// ============
+/// Current Day
+/// ============
+///
+/// Copied from [CurrentDay].
 @ProviderFor(CurrentDay)
 final currentDayProvider =
     AutoDisposeNotifierProvider<CurrentDay, int>.internal(

@@ -34,9 +34,8 @@ const _$GenderEnumMap = {Gender.M: 'M', Gender.F: 'F'};
 
 const _$GoalEnumMap = {
   Goal.Weight_Loss: 'Weight_Loss',
+  Goal.Maintenance: 'Maintenance',
   Goal.Weight_Gain: 'Weight_Gain',
-  Goal.Maintain_Weight: 'Maintain_Weight',
-  Goal.Build_Muscle: 'Build_Muscle',
 };
 
 const _$ActivityLevelEnumMap = {

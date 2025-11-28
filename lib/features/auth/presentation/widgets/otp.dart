@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:fitai_mobile/core/widgets/app_text_field.dart';
+import 'package:flutter/gestures.dart';
 
 class Otp extends StatefulWidget {
   final void Function(String code)? onCompleted;
   final VoidCallback? onResend;
+  final void Function(String code)? onCodeChanged;
   final int length;
   final int seconds;
 
@@ -13,6 +14,7 @@ class Otp extends StatefulWidget {
     super.key,
     this.onCompleted,
     this.onResend,
+    this.onCodeChanged,
     this.length = 6,
     this.seconds = 45,
   });
@@ -63,6 +65,12 @@ class _OtpState extends State<Otp> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
+  void _emitCurrentCode() {
+    if (widget.onCodeChanged != null) {
+      widget.onCodeChanged!.call(_ctl.map((c) => c.text).join());
+    }
+  }
+
   void _onChanged(int i, String v) {
     // nếu paste nhiều ký tự -> chỉ giữ ký tự cuối
     if (v.length > 1) {
@@ -83,14 +91,15 @@ class _OtpState extends State<Otp> with SingleTickerProviderStateMixin {
       );
     }
 
-    // backspace khi đang trống -> lùi về ô trước
+    // backspace khi trống -> lùi về ô trước
     if (v.isEmpty && i > 0) {
       _nodes[i - 1].requestFocus();
-      _ctl[i - 1].selection = TextSelection(
-        baseOffset: 0,
-        extentOffset: _ctl[i - 1].text.length,
-      );
+      _ctl[i - 1]
+        ..text = ''
+        ..selection = const TextSelection(baseOffset: 0, extentOffset: 0);
     }
+
+    _emitCurrentCode();
 
     // đủ mã -> callback
     if (_ctl.every((c) => c.text.isNotEmpty)) {
@@ -117,7 +126,8 @@ class _OtpState extends State<Otp> with SingleTickerProviderStateMixin {
     final isCompact = shortest < 380;
 
     // kích thước “đẹp” mặc định
-    final double boxWidth = isCompact ? 44.0 : 56.0;
+    // base sizes rồi sẽ scale theo width thực tế
+    final double baseBoxWidth = isCompact ? 52.0 : 64.0;
     final double boxHPad = isCompact ? 4.0 : 6.0;
     final double iconBoxSize = isCompact ? 70.0 : 80.0;
     final double iconSize = isCompact ? 40.0 : 48.0;
@@ -186,59 +196,117 @@ class _OtpState extends State<Otp> with SingleTickerProviderStateMixin {
 
               SizedBox(height: isCompact ? 8 : 10),
 
-              // 🔹 Các ô nhập OTP – vừa đẹp vừa không overflow
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final maxWidth = constraints.maxWidth;
+                  final availableWidth = constraints.maxWidth;
+                  final totalSpacing = (widget.length * 2) * boxHPad;
 
-                  // tổng width cần thiết nếu muốn giữ boxWidth hiện tại
-                  final totalWidth =
-                      widget.length * boxWidth +
-                      (widget.length - 1) * boxHPad * 2;
+                  double finalBoxWidth = baseBoxWidth;
+                  final totalNeeded =
+                      widget.length * baseBoxWidth + totalSpacing;
 
-                  // widget render 1 row otp
-                  Widget buildRow() {
-                    return Row(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(widget.length, (i) {
-                        return SizedBox(
-                          width: boxWidth,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(horizontal: boxHPad),
-                            child: AppTextField(
+                  if (totalNeeded > availableWidth) {
+                    final adjusted =
+                        (availableWidth - totalSpacing) / widget.length;
+                    finalBoxWidth = adjusted.clamp(40.0, baseBoxWidth);
+                  }
+
+                  final boxFontSize = (finalBoxWidth * 0.4).clamp(
+                    16.0,
+                    isCompact ? 20.0 : 22.0,
+                  );
+
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(widget.length, (i) {
+                      return SizedBox(
+                        width: finalBoxWidth,
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: boxHPad),
+                          child: Focus(
+                            onKeyEvent: (node, event) {
+                              if (event is KeyDownEvent &&
+                                  event.logicalKey ==
+                                      LogicalKeyboardKey.backspace &&
+                                  _ctl[i].text.isEmpty &&
+                                  i > 0) {
+                                _nodes[i - 1].requestFocus();
+                                _ctl[i - 1]
+                                  ..text = ''
+                                  ..selection = const TextSelection(
+                                    baseOffset: 0,
+                                    extentOffset: 0,
+                                  );
+                                return KeyEventResult.handled;
+                              }
+                              return KeyEventResult.ignored;
+                            },
+                            child: TextField(
                               controller: _ctl[i],
                               focusNode: _nodes[i],
                               keyboardType: TextInputType.number,
                               maxLines: 1,
                               textAlign: TextAlign.center,
+                              textAlignVertical: TextAlignVertical.center,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: boxFontSize,
+                              ),
+                              cursorColor: cs.primary,
+                              decoration: InputDecoration(
+                                counterText: '',
+                                isDense: true,
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: finalBoxWidth * 0.25,
+                                ),
+                                filled: true,
+                                fillColor: cs.surfaceVariant.withValues(
+                                  alpha: 0.8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: cs.primary,
+                                    width: 2,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              ),
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
                                 LengthLimitingTextInputFormatter(1),
                               ],
                               onChanged: (v) => _onChanged(i, v),
+                              onSubmitted: (_) {
+                                if (i > 0 && _ctl[i].text.isEmpty) {
+                                  _nodes[i - 1].requestFocus();
+                                }
+                              },
+                              onEditingComplete: () {
+                                if (_ctl[i].text.isEmpty && i > 0) {
+                                  _nodes[i - 1].requestFocus();
+                                }
+                              },
                             ),
                           ),
-                        );
-                      }),
-                    );
-                  }
-
-                  // Nếu đủ chỗ -> center trong maxWidth
-                  if (totalWidth <= maxWidth) {
-                    return SizedBox(
-                      width: maxWidth,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [buildRow()],
-                      ),
-                    );
-                  }
-
-                  // Nếu KHÔNG đủ chỗ -> cho scroll ngang, giữ size đẹp
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: buildRow(),
+                        ),
+                      );
+                    }),
                   );
                 },
               ),

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:fitai_mobile/features/process/data/models/achievement_models.dart';
 import 'package:fitai_mobile/features/process/presentation/widgets/achievement_summary_card.dart';
 import 'package:fitai_mobile/core/widgets/inbody_history_chart.dart'
     show InbodyRecord, InbodyHistoryChart;
@@ -17,18 +16,16 @@ import 'package:fitai_mobile/features/daily/presentation/viewmodels/process_prov
 
 // Provider cho AI health plan (prepare next checkpoint, next target, generate meal)
 import 'package:fitai_mobile/features/process/presentation/viewmodels/ai_healthplan_providers.dart';
+import 'package:fitai_mobile/features/process/presentation/viewmodels/achievement_providers.dart';
 
 class ProgressReviewBody extends ConsumerStatefulWidget {
   final List<InbodyRecord> history;
-  final AchievementSummary? achievementSummary;
-
   final VoidCallback? onBackToCheckin;
   final VoidCallback? onRequestNewPlan;
 
   const ProgressReviewBody({
     super.key,
     required this.history,
-    this.achievementSummary,
     this.onBackToCheckin,
     this.onRequestNewPlan,
   });
@@ -134,9 +131,6 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
 
     final history = widget.history;
     final hasHistory = history.isNotEmpty;
-    final latest = hasHistory ? history.last : null;
-    final previous = history.length > 1 ? history[history.length - 2] : null;
-
     final lastThree = history.length >= 3
         ? history.sublist(history.length - 3)
         : List<InbodyRecord>.from(history);
@@ -146,6 +140,7 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
 
     // 👉 Lấy body composition data từ API
     final asyncBodyComp = ref.watch(bodyCompositionPieProvider);
+    final achievementAsync = ref.watch(achievementSummaryProvider);
 
     // 👉 Screen: có scroll riêng, mỗi phần có container riêng
     return SingleChildScrollView(
@@ -200,27 +195,20 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
                 children: [
                   Text("Ảnh đối chiếu", style: tt.titleSmall),
                   const SizedBox(height: 12),
-                  if (latest != null && previous != null)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _photoCompare(
+                  if (hasHistory)
+                    Column(
+                      children: List.generate(
+                        history.length,
+                        (index) => Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == history.length - 1 ? 0 : 16,
+                          ),
+                          child: _checkpointPhotoSet(
                             context,
-                            label: "Lần đo ${previous.checkpointNumber}",
-                            weight: previous.weight,
-                            photoUrl: previous.frontImageUrl,
+                            record: history[index],
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _photoCompare(
-                            context,
-                            label: "Lần đo ${latest.checkpointNumber}",
-                            weight: latest.weight,
-                            photoUrl: latest.frontImageUrl,
-                          ),
-                        ),
-                      ],
+                      ),
                     )
                   else
                     Text(
@@ -306,7 +294,20 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
           /// =====================
           /// ACHIEVEMENT SUMMARY (có container riêng)
           /// =====================
-          AchievementSummaryCard(summary: widget.achievementSummary),
+          achievementAsync.when(
+            data: (summary) => AchievementSummaryCard(summary: summary),
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (e, _) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'Không tải được thành tích: $e',
+                style: tt.bodySmall?.copyWith(color: cs.error),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
 
           /// =====================
@@ -406,12 +407,48 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
   }
 
   /// =======================
-  /// Photo Compare
-  /// =======================
-  Widget _photoCompare(
+  Widget _checkpointPhotoSet(
+    BuildContext context, {
+    required InbodyRecord record,
+  }) {
+    final tt = Theme.of(context).textTheme;
+    final infoText =
+        "Lần đo ${record.checkpointNumber} – ${record.weight.toStringAsFixed(1)}kg";
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          infoText,
+          style: tt.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _photoTile(
+                context,
+                label: 'Chính diện',
+                photoUrl: record.frontImageUrl,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _photoTile(
+                context,
+                label: 'Mặt cạnh (R)',
+                photoUrl: record.rightImageUrl,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _photoTile(
     BuildContext context, {
     required String label,
-    required double weight,
     required String? photoUrl,
   }) {
     final cs = Theme.of(context).colorScheme;
@@ -424,7 +461,7 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
           borderRadius: BorderRadius.circular(12),
           child: photoUrl == null
               ? AspectRatio(
-                  aspectRatio: 1,
+                  aspectRatio: 9 / 16,
                   child: Container(
                     color: cs.surfaceVariant,
                     child: const Icon(Icons.person, size: 40),
@@ -432,12 +469,12 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
                 )
               : Image.network(
                   photoUrl,
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                   width: double.infinity,
                 ),
         ),
         const SizedBox(height: 6),
-        Text("$label – ${weight.toStringAsFixed(1)}kg", style: tt.bodySmall),
+        Text(label, style: tt.bodySmall),
       ],
     );
   }

@@ -9,9 +9,9 @@ import 'package:fitai_mobile/core/router/app_router.dart';
 import 'package:fitai_mobile/features/auth/presentation/widgets/otp.dart';
 import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
 
-class VerificationScreen extends ConsumerWidget {
+class VerificationScreen extends ConsumerStatefulWidget {
   final String? email;
-  final String? password; // 👈 password vừa đăng ký
+  final String? password;
 
   const VerificationScreen({
     super.key,
@@ -19,12 +19,88 @@ class VerificationScreen extends ConsumerWidget {
     required this.password,
   });
 
+  @override
+  ConsumerState<VerificationScreen> createState() => _VerificationScreenState();
+}
+
+class _VerificationScreenState extends ConsumerState<VerificationScreen> {
+  String _currentOtp = '';
+  bool get _isOtpFilled => _currentOtp.length >= 6;
+
   void _goWelcome(BuildContext context) {
     context.goNamed(AppRoute.welcome.name);
   }
 
+  Future<void> _verifyCode(BuildContext context, String code) async {
+    final email = widget.email;
+    final messenger = ScaffoldMessenger.of(context);
+
+    if (email == null || email.isEmpty) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Thiếu email để xác thực OTP.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final ok = await ref
+        .read(authNotifierProvider.notifier)
+        .verifyOtp(email: email, otpCode: code);
+
+    if (!ok) {
+      final err = ref.read(authErrorProvider) ?? 'Mã OTP không hợp lệ.';
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    if (widget.password == null || widget.password!.isEmpty) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Tài khoản đã được kích hoạt. Vui lòng đăng nhập lại.',
+            ),
+          ),
+        );
+        context.goNamed(AppRoute.welcome.name);
+      }
+      return;
+    }
+
+    await ref
+        .read(authNotifierProvider.notifier)
+        .login(email: email, password: widget.password!, rememberMe: true);
+
+    final authState = ref.read(authNotifierProvider).value;
+
+    if (authState?.isAuthenticated == true) {
+      if (context.mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Xác thực & đăng nhập thành công!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        context.go('/setup/overview');
+      }
+    } else {
+      final err = authState?.error ?? 'Đăng nhập sau khi xác thực thất bại.';
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final isLoading = ref.watch(isAuthLoadingProvider);
 
     return PopScope(
@@ -58,18 +134,21 @@ class VerificationScreen extends ConsumerWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Otp(
-                                  // ✅ Nhập đủ số → verify + auto login
                                   onCompleted: (code) async {
                                     FocusScope.of(context).unfocus();
+                                    await _verifyCode(context, code);
+                                  },
+                                  onResend: () async {
                                     final messenger = ScaffoldMessenger.of(
                                       context,
                                     );
 
-                                    if (email == null || email!.isEmpty) {
+                                    if (widget.email == null ||
+                                        widget.email!.isEmpty) {
                                       messenger.showSnackBar(
                                         const SnackBar(
                                           content: Text(
-                                            'Thiếu email để xác thực OTP.',
+                                            'Không thể gửi lại OTP vì thiếu email.',
                                           ),
                                           backgroundColor: Colors.red,
                                         ),
@@ -77,91 +156,23 @@ class VerificationScreen extends ConsumerWidget {
                                       return;
                                     }
 
-                                    // 1. Gọi verify OTP
-                                    final ok = await ref
+                                    final resp = await ref
                                         .read(authNotifierProvider.notifier)
-                                        .verifyOtp(
-                                          email: email!,
-                                          otpCode: code,
-                                        );
+                                        .resendOtp(email: widget.email!);
 
-                                    if (!ok) {
-                                      final err =
-                                          ref.read(authErrorProvider) ??
-                                          'Mã OTP không hợp lệ.';
-                                      if (context.mounted) {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(err),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                      return;
-                                    }
+                                    if (!context.mounted) return;
 
-                                    // 2. Verify OTP OK ⇒ auto login nếu có password
-                                    if (password == null || password!.isEmpty) {
-                                      // fallback: đã verify nhưng không có pass để login
-                                      if (context.mounted) {
-                                        messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Tài khoản đã được kích hoạt. Vui lòng đăng nhập lại.',
-                                            ),
-                                          ),
-                                        );
-                                        context.goNamed(AppRoute.welcome.name);
-                                      }
-                                      return;
-                                    }
-
-                                    await ref
-                                        .read(authNotifierProvider.notifier)
-                                        .login(
-                                          email: email!,
-                                          password: password!,
-                                          rememberMe: true,
-                                        );
-
-                                    final authState = ref
-                                        .read(authNotifierProvider)
-                                        .value;
-
-                                    if (authState?.isAuthenticated == true) {
-                                      if (context.mounted) {
-                                        messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Xác thực & đăng nhập thành công!',
-                                            ),
-                                            backgroundColor: Colors.green,
-                                          ),
-                                        );
-                                        // ✅ Auto đi tới /home
-                                        context.go('/home');
-                                      }
-                                    } else {
-                                      final err =
-                                          authState?.error ??
-                                          'Đăng nhập sau khi xác thực thất bại.';
-                                      if (context.mounted) {
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text(err),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  },
-                                  onResend: () {
-                                    // TODO: sau này gọi API resend OTP ở đây
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Đã gửi lại mã xác thực'),
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(resp.message),
+                                        backgroundColor: resp.success
+                                            ? Colors.green
+                                            : Colors.red,
                                       ),
                                     );
+                                  },
+                                  onCodeChanged: (code) {
+                                    setState(() => _currentOtp = code);
                                   },
                                 ),
                                 const SizedBox(height: 24),
@@ -183,15 +194,25 @@ class VerificationScreen extends ConsumerWidget {
                                         variant: AppButtonVariant.filled,
                                         onPressed: isLoading
                                             ? null
-                                            : () {
-                                                ScaffoldMessenger.of(
-                                                  context,
-                                                ).showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Mã OTP sẽ được xác thực tự động khi bạn nhập đủ số.',
+                                            : () async {
+                                                if (!_isOtpFilled) {
+                                                  ScaffoldMessenger.of(
+                                                    context,
+                                                  ).showSnackBar(
+                                                    const SnackBar(
+                                                      content: Text(
+                                                        'Vui lòng nhập đủ 6 số trước khi xác nhận.',
+                                                      ),
                                                     ),
-                                                  ),
+                                                  );
+                                                  return;
+                                                }
+                                                FocusScope.of(
+                                                  context,
+                                                ).unfocus();
+                                                await _verifyCode(
+                                                  context,
+                                                  _currentOtp,
                                                 );
                                               },
                                       ),

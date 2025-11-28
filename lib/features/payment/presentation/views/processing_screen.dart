@@ -125,14 +125,22 @@ class _ProcessingScreenState extends ConsumerState<ProcessingScreen> {
     ],
   );
 
-  String _money(int amount, String currency) {
-    if (currency.toUpperCase() == 'VND') {
-      final vnd = amount.toString().replaceAllMapped(
+  String _money(num amount, String currency) {
+    final upper = currency.toUpperCase();
+
+    if (upper == 'VND') {
+      final vndInt = amount.round();
+      final vnd = vndInt.toString().replaceAllMapped(
         RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
       return '$vnd đ';
     }
-    return '$amount ${currency.toUpperCase()}';
+
+    final formatted = (amount is int)
+        ? amount.toString()
+        : amount.toStringAsFixed(2);
+
+    return '$formatted $upper';
   }
 }
