@@ -44,7 +44,7 @@ class MealPlanPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ===== Header: Tên bữa ăn =====
+          // ===== Header: Tên bữa ăn + kcal =====
           Row(
             children: [
               Expanded(
@@ -53,39 +53,33 @@ class MealPlanPreviewCard extends StatelessWidget {
                   style: t.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ),
+              _MacroDot(
+                color: Colors.orangeAccent, // giống hình demo
+                label: '$kcal kcal',
+                textStyle: t.bodySmall,
+              ),
             ],
           ),
           const SizedBox(height: 6),
 
-          // ===== Macro bữa ăn: C/P/F + kcal =====
-          Row(
+          // ===== Macro bữa ăn: C/P/F (không còn kcal) =====
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
             children: [
-              Expanded(
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    _MacroDot(
-                      color: Colors.orangeAccent,
-                      label: 'Carb: $carbs g',
-                      textStyle: t.bodySmall,
-                    ),
-                    _MacroDot(
-                      color: Colors.lightGreenAccent,
-                      label: 'Protein: $protein g',
-                      textStyle: t.bodySmall,
-                    ),
-                    _MacroDot(
-                      color: Colors.cyanAccent,
-                      label: 'Fat: $fat g',
-                      textStyle: t.bodySmall,
-                    ),
-                  ],
-                ),
+              _MacroDot(
+                color: Colors.orangeAccent,
+                label: 'Carb: $carbs g',
+                textStyle: t.bodySmall,
               ),
               _MacroDot(
-                color: cs.primary,
-                label: '$kcal kcal',
+                color: Colors.lightGreenAccent,
+                label: 'Protein: $protein g',
+                textStyle: t.bodySmall,
+              ),
+              _MacroDot(
+                color: Colors.cyanAccent,
+                label: 'Fat: $fat g',
                 textStyle: t.bodySmall,
               ),
             ],
@@ -94,33 +88,32 @@ class MealPlanPreviewCard extends StatelessWidget {
           const SizedBox(height: 10),
           Divider(color: cs.outlineVariant, height: 16),
 
-          // ===== Danh sách món ăn =====
           _MealFoodsTable(foods: meal.foods),
           const SizedBox(height: 12),
 
-          // ===== Nút Chọn =====
-          Align(
-            alignment: Alignment.centerRight,
-            child: OutlinedButton(
-              onPressed: onSelect == null ? null : () => onSelect!(meal),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: cs.primary),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                minimumSize: const Size(0, 0),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: Text(
-                isSelected ? 'Đã chọn' : 'Chọn',
-                style: t.bodySmall?.copyWith(
-                  color: cs.primary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
+          // // ===== Nút Chọn =====
+          // Align(
+          //   alignment: Alignment.centerRight,
+          //   child: OutlinedButton(
+          //     onPressed: onSelect == null ? null : () => onSelect!(meal),
+          //     style: OutlinedButton.styleFrom(
+          //       side: BorderSide(color: cs.primary),
+          //       padding: const EdgeInsets.symmetric(
+          //         horizontal: 12,
+          //         vertical: 6,
+          //       ),
+          //       minimumSize: const Size(0, 0),
+          //       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          //     ),
+          //     child: Text(
+          //       isSelected ? 'Đã chọn' : 'Chọn',
+          //       style: t.bodySmall?.copyWith(
+          //         color: cs.primary,
+          //         fontWeight: FontWeight.w600,
+          //       ),
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );

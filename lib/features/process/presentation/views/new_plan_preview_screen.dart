@@ -112,10 +112,9 @@ class _NewPlanPreviewBodyState extends ConsumerState<NewPlanPreviewBody> {
         final safeIndex = _selectedMealIndex.clamp(0, maxIndex);
         final selectedDay = days[safeIndex];
         final selectedDate = _dateFromIndex(safeIndex);
-
-        // Tuần mới kết thúc sau N ngày của plan (7 hoặc 14)
         final weekEndDate = _baseDate.add(Duration(days: days.length));
-
+        final firstDate = _baseDate;
+        final lastDate = _baseDate.add(Duration(days: days.length - 1));
         // Target cho checkpoint tiếp theo (có thể null nếu đang load / lỗi)
         final nextTarget = nextTargetAsync.asData?.value;
 
@@ -139,15 +138,15 @@ class _NewPlanPreviewBodyState extends ConsumerState<NewPlanPreviewBody> {
 
               const SizedBox(height: 16),
 
-              // ===== DATE PICKER (MEAL) =====
               DailyDateSelector(
                 selectedDate: selectedDate,
+                firstDate: firstDate,
+                lastDate: lastDate,
                 onChanged: (date) => _onMealDateChanged(date, days.length),
               ),
 
               const SizedBox(height: 8),
 
-              // ---------- MEAL PLAN ---------- //
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,

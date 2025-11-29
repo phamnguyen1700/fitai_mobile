@@ -374,63 +374,63 @@ class _ProPlanChatState extends ConsumerState<_ProPlanChat> {
     super.initState();
   }
 
-  /// Gọi lần lượt:
-  /// 1. generate workout plan
-  /// 2. generate meal plan
-  /// Cả 2 xong → cho phép "Xem plan"
   Future<void> _handleGetPlan() async {
-    // Nếu cả 2 đã xong → nhảy sang màn preview
-    if (_workoutDone && _mealDone) {
-      ref.read(homeViewProvider.notifier).state = HomeView.planPreview;
-      return;
-    }
-
-    // Đang chạy cái gì đó thì bỏ qua để tránh spam
     if (_isGeneratingWorkout || _isGeneratingMeal) return;
+    setState(() {
+      _workoutDone = false;
+      _mealDone = false;
+    });
+    ref.invalidate(workoutPlanGenerateProvider);
+    ref.invalidate(mealPlanGenerateProvider);
+    try {
+      setState(() {
+        _isGeneratingWorkout = true;
+        _isGeneratingMeal = false;
+      });
 
-    // Bước 1: chưa có workout → generate workout trước
-    if (!_workoutDone) {
-      setState(() => _isGeneratingWorkout = true);
+      debugPrint('▶️ [GetPlan] Bắt đầu generate WORKOUT...');
+      await ref.read(workoutPlanGenerateProvider.future);
+      if (!mounted) return;
 
-      try {
-        await ref.read(workoutPlanGenerateProvider.future);
-        if (!mounted) return;
-        setState(() {
-          _isGeneratingWorkout = false;
-          _workoutDone = true;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isGeneratingWorkout = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tạo lịch tập thất bại, thử lại sau nhé.'),
+      setState(() {
+        _isGeneratingWorkout = false;
+        _workoutDone = true;
+      });
+      debugPrint('✅ [GetPlan] WORKOUT xong.');
+      setState(() {
+        _isGeneratingMeal = true;
+      });
+
+      debugPrint('▶️ [GetPlan] Bắt đầu generate MEAL...');
+      await ref.read(mealPlanGenerateProvider.future);
+      if (!mounted) return;
+
+      setState(() {
+        _isGeneratingMeal = false;
+        _mealDone = true;
+      });
+      debugPrint('✅ [GetPlan] MEAL xong.');
+      ref.read(homeViewProvider.notifier).state = HomeView.planPreview;
+    } catch (e, st) {
+      if (!mounted) return;
+
+      debugPrint('❌ [GetPlan] Lỗi khi generate plan: $e\n$st');
+
+      setState(() {
+        _isGeneratingWorkout = false;
+        _isGeneratingMeal = false;
+      });
+      final isWorkoutError = !_workoutDone;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isWorkoutError
+                ? 'Tạo lịch tập thất bại, thử lại sau nhé.'
+                : 'Tạo thực đơn thất bại, thử lại sau nhé.',
           ),
-        );
-        return; // dừng, không chạy meal nữa
-      }
-    }
-
-    // Bước 2: workout xong rồi → generate meal
-    if (_workoutDone && !_mealDone) {
-      setState(() => _isGeneratingMeal = true);
-
-      try {
-        await ref.read(mealPlanGenerateProvider.future);
-        if (!mounted) return;
-        setState(() {
-          _isGeneratingMeal = false;
-          _mealDone = true;
-        });
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isGeneratingMeal = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Tạo thực đơn thất bại, thử lại sau nhé.'),
-          ),
-        );
-      }
+        ),
+      );
     }
   }
 
@@ -836,9 +836,7 @@ class _ChatMessageList extends StatelessWidget {
                           GestureDetector(
                             onTap: onGetPlan,
                             child: Text(
-                              (workoutDone && mealDone)
-                                  ? 'Xem plan'
-                                  : 'Nhận plan',
+                              'Nhận plan',
                               style: t.labelMedium?.copyWith(
                                 color: cs.primary,
                                 fontWeight: FontWeight.w700,

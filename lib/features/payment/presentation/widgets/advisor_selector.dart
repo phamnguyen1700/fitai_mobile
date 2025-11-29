@@ -55,7 +55,7 @@ class _AdvisorSelectorState extends State<AdvisorSelector> {
     }
 
     return SizedBox(
-      height: 170,
+      height: 140,
       child: PageView.builder(
         controller: _pageController,
         itemCount: widget.advisors.length,

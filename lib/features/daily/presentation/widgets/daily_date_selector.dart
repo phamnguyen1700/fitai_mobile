@@ -8,9 +8,13 @@ class DailyDateSelector extends StatelessWidget {
     required this.onChanged,
     this.disabledDates,
     this.locale = 'vi',
+    required this.firstDate,
+    required this.lastDate,
   });
 
   final DateTime selectedDate;
+  final DateTime firstDate; // ngày bắt đầu range
+  final DateTime lastDate; // ngày kết thúc range
   final ValueChanged<DateTime> onChanged;
   final List<DateTime>? disabledDates;
   final String locale;
@@ -20,17 +24,14 @@ class DailyDateSelector extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return EasyDateTimeLine(
-      initialDate: selectedDate,
+    return EasyInfiniteDateTimeLine(
+      firstDate: firstDate,
+      lastDate: lastDate,
+      focusDate: selectedDate,
       disabledDates: disabledDates,
       locale: locale,
       activeColor: cs.primary,
-
-      headerProps: const EasyHeaderProps(
-        showHeader: false,
-        showMonthPicker: false,
-        showSelectedDate: false,
-      ),
+      showTimelineHeader: false,
 
       timeLineProps: const EasyTimeLineProps(
         hPadding: 24,
@@ -45,11 +46,10 @@ class DailyDateSelector extends StatelessWidget {
         dayStructure: DayStructure.monthDayNumDayStr,
         borderColor: Colors.transparent,
 
-        // 🟢 Ngày bình thường (nền surface)
         inactiveDayStyle: DayStyle(
           borderRadius: 8,
           decoration: BoxDecoration(
-            color: cs.surface, // ✅ Nền surface
+            color: cs.surface,
             borderRadius: BorderRadius.circular(8),
           ),
           monthStrStyle: TextStyle(
@@ -67,11 +67,10 @@ class DailyDateSelector extends StatelessWidget {
           ),
         ),
 
-        // 🟠 Ngày đang chọn (nền primary)
         activeDayStyle: DayStyle(
           borderRadius: 8,
           decoration: BoxDecoration(
-            color: cs.primary, // ✅ Nền cam đậm khi chọn
+            color: cs.primary,
             borderRadius: BorderRadius.circular(8),
           ),
           monthStrStyle: const TextStyle(fontSize: 11, color: Colors.white),
@@ -83,17 +82,16 @@ class DailyDateSelector extends StatelessWidget {
           dayStrStyle: const TextStyle(fontSize: 12, color: Colors.white),
         ),
 
-        // 🟡 Ngày hôm nay (nền surface + overlay cam mờ)
         todayStyle: DayStyle(
           borderRadius: 8,
           decoration: BoxDecoration(
-            color: cs.surface, // nền chính là surface
+            color: cs.surface,
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
                 color: cs.primary.withOpacity(0.15),
                 blurRadius: 0,
-                spreadRadius: 2, // hiệu ứng overlay nhẹ
+                spreadRadius: 2,
               ),
             ],
           ),

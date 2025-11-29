@@ -1,6 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
+import 'package:fitai_mobile/features/auth/data/models/user_model.dart';
 import 'package:fitai_mobile/features/payment/presentation/viewmodels/payment_provider.dart';
 import '../../data/models/subscription_product.dart';
 import '../../data/models/payment_create_models.dart';
@@ -11,47 +11,37 @@ part 'payment_controller.g.dart';
 class PaymentController extends _$PaymentController {
   @override
   Future<void> build() async {
-    // Không cần làm gì lúc init, chỉ để có AsyncNotifier<void>
+    // Không cần làm gì khi init, chỉ để có AsyncNotifier<void>
   }
 
   Future<PaymentCreateResponse?> createPaymentSession(
     SubscriptionProduct plan,
+    UserModel user,
   ) async {
     final repo = ref.read(paymentProvider);
-    final user = ref.read(currentUserProvider);
-
-    if (user == null) {
-      state = AsyncValue.error("Người dùng chưa đăng nhập", StackTrace.current);
-      return null;
-    }
 
     state = const AsyncValue.loading();
 
     try {
-      // DEBUG: in ra cho chắc nó chạy tới đây
-      // ignore: avoid_print
+      // DEBUG
       print('[PaymentController] creating payment for plan: ${plan.name}');
+      print('[PaymentController] userId = ${user.id}, email = ${user.email}');
 
       final result = await repo.createPayment(
-        userId: user.id, // nếu id nullable thì sửa trong model User
+        userId: user.id,
         email: user.email,
         name: "${user.firstName ?? ''} ${user.lastName ?? ''}".trim(),
-        // KHÔNG nên truyền "" – null là đúng với PaymentCreateRequest
         stripeCustomerId: null,
         plan: plan,
         successUrl: "fitaiplanning://payment/result/success",
         cancelUrl: "fitaiplanning://payment/result/failed",
       );
 
-      // DEBUG: in ra sessionUrl
-      // ignore: avoid_print
       print('[PaymentController] sessionUrl = ${result.sessionUrl}');
 
-      // build() là Future<void> nên state là AsyncValue<void> → data(null)
       state = const AsyncValue.data(null);
       return result;
     } catch (e, st) {
-      // ignore: avoid_print
       print('[PaymentController] error: $e');
       state = AsyncValue.error(e, st);
       return null;
