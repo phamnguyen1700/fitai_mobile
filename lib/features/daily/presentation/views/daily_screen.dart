@@ -27,6 +27,7 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
   late final DateTime _lastDate = _today.add(const Duration(days: 7));
 
   DateTime _selected = DateUtils.dateOnly(DateTime.now());
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -40,8 +41,10 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
     final user = ref.watch(currentUserProvider);
     final tierType = ref.watch(currentTierTypeProvider);
 
+    final onboardingStep = user?.onboardingStep;
+
     /// =============
-    /// Gate 1: Premium+
+    /// Gate 1: Premium+ (lớp ngoài cùng)
     /// =============
     return OnboardingGate(
       onboardingStep: null,
@@ -56,198 +59,214 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
       borderRadius: BorderRadius.zero,
 
       /// =============
-      /// Gate 2: chưa có kế hoạch
+      /// Gate 2: Chưa có kế hoạch (lớp giữa)
       /// =============
       child: OnboardingGate(
-        onboardingStep:
-            mealPlanStatus, // 'has_plan', 'no_plan', 'error', 'loading'
+        onboardingStep: mealPlanStatus, // 'has_plan', 'no_plan', ...
         subscriptionProductName: null,
         shouldLock: (status) => status == 'no_plan',
         lockTitle: 'Chưa có kế hoạch',
         lockMessage: 'Bạn chưa có kế hoạch nào hoạt động.',
-
         borderRadius: BorderRadius.zero,
 
-        child: SafeArea(
-          top: false,
-          child: CustomScrollView(
-            slivers: [
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: DailyChallengeCard(
-                    deadline: TimeOfDay(hour: 9, minute: 0),
-                    participants: [
-                      AssetImage('lib/core/assets/images/sticker1.png'),
-                      AssetImage('lib/core/assets/images/sticker1.png'),
-                      AssetImage('lib/core/assets/images/sticker1.png'),
-                    ],
-                    totalParticipants: 7,
-                    illustration: AssetImage(
-                      'lib/core/assets/images/challenge.png',
-                    ),
-                  ),
-                ),
-              ),
+        /// =============
+        /// Gate 3: Đang chờ advisor duyệt (lớp trong cùng)
+        /// =============
+        child: OnboardingGate(
+          onboardingStep: onboardingStep, // ví dụ: 'WaitingReview'
+          subscriptionProductName: null,
+          shouldLock: (step) => step == 'WaitingReview',
+          lockTitle: 'Đang chờ cố vấn duyệt',
+          lockMessage:
+              'Cố vấn của bạn đang xem xét hồ sơ và chuẩn bị kế hoạch cá nhân hóa. '
+              'FitAI sẽ gửi thông báo khi kế hoạch được duyệt xong.',
+          borderRadius: BorderRadius.zero,
 
-              /// ===== Date selector =====
-              SliverPersistentHeader(
-                pinned: false,
-                delegate: _StickyDateSelectorDelegate(
-                  extent: 120,
-                  child: ColoredBox(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                      child: DailyDateSelector(
-                        selectedDate: _selected,
-                        firstDate: _firstDate, // 👈 thêm
-                        lastDate: _lastDate, // 👈 thêm
-                        onChanged: (d) {
-                          ref.read(currentDayProvider.notifier).set(d.weekday);
-                          setState(() => _selected = d);
-                        },
+          child: SafeArea(
+            top: false,
+            child: CustomScrollView(
+              slivers: [
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: DailyChallengeCard(
+                      deadline: TimeOfDay(hour: 9, minute: 0),
+                      participants: [
+                        AssetImage('lib/core/assets/images/sticker1.png'),
+                        AssetImage('lib/core/assets/images/sticker1.png'),
+                        AssetImage('lib/core/assets/images/sticker1.png'),
+                      ],
+                      totalParticipants: 7,
+                      illustration: AssetImage(
+                        'lib/core/assets/images/challenge.png',
                       ),
                     ),
                   ),
                 ),
-              ),
 
-              /// ===== Meal plan =====
-              SliverToBoxAdapter(
-                child: asyncMeals.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Không tải được lịch ăn.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  data: (res) => res.status == 'has_plan'
-                      ? TodayMealPlan(
-                          day: res.data!,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          waitingReviewMessage: user?.message,
-                          onReload: () => ref.invalidate(todayMealsProvider),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
-
-              /// ===== Workout plan =====
-              SliverToBoxAdapter(
-                child: asyncWorkoutDays.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Không tải được lịch tập.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  data: (days) => TodayWorkoutPlanCard(
-                    days: days,
-                    initialDayNumber: days.isNotEmpty
-                        ? days.first.dayNumber
-                        : null,
-                    waitingReviewMessage: user?.message,
-                  ),
-                ),
-              ),
-
-              /// ===== Progress overview =====
-              SliverToBoxAdapter(
-                child: asyncBodyComp.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (_, __) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Không tải được dữ liệu cơ thể.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  data: (pieResp) {
-                    final pie = pieResp.data;
-                    final fatPercent = pie?.bodyFatPercent ?? 0;
-                    final musclePercent = pie?.skeletalMusclePercent ?? 0;
-                    final bonePercent = pie?.remainingPercent ?? 0;
-
-                    return asyncLine.when(
-                      loading: () => const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                      error: (_, __) => Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          'Không tải được lịch sử InBody.',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: cs.onSurfaceVariant),
+                /// ===== Date selector =====
+                SliverPersistentHeader(
+                  pinned: false,
+                  delegate: _StickyDateSelectorDelegate(
+                    extent: 120,
+                    child: ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                        child: DailyDateSelector(
+                          selectedDate: _selected,
+                          firstDate: _firstDate, // 👈 thêm
+                          lastDate: _lastDate, // 👈 thêm
+                          onChanged: (d) {
+                            ref
+                                .read(currentDayProvider.notifier)
+                                .set(d.weekday);
+                            setState(() => _selected = d);
+                          },
                         ),
                       ),
-                      data: (lineResp) {
-                        final list =
-                            lineResp.data
-                                .map(
-                                  (p) => InbodyRecord(
-                                    checkpointNumber: p.checkpointNumber,
-                                    measuredAt: p.measuredAt,
-                                    weight: p.weightKg.toDouble(),
-                                    smm: p.skeletalMuscleMass / 1000.0,
-                                    pbf: p.fatPercent.toDouble(),
+                    ),
+                  ),
+                ),
+
+                /// ===== Meal plan =====
+                SliverToBoxAdapter(
+                  child: asyncMeals.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Không tải được lịch ăn.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    data: (res) => res.status == 'has_plan'
+                        ? TodayMealPlan(
+                            tierType: tierType,
+                            day: res.data!,
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            waitingReviewMessage: user?.message,
+                            onReload: () => ref.invalidate(todayMealsProvider),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+
+                /// ===== Workout plan =====
+                SliverToBoxAdapter(
+                  child: asyncWorkoutDays.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Không tải được lịch tập.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    data: (days) => TodayWorkoutPlanCard(
+                      tierType: tierType,
+                      days: days,
+                      initialDayNumber: days.isNotEmpty
+                          ? days.first.dayNumber
+                          : null,
+                      waitingReviewMessage: user?.message,
+                    ),
+                  ),
+                ),
+
+                /// ===== Progress overview =====
+                SliverToBoxAdapter(
+                  child: asyncBodyComp.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (_, __) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        'Không tải được dữ liệu cơ thể.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    data: (pieResp) {
+                      final pie = pieResp.data;
+                      final fatPercent = pie?.bodyFatPercent ?? 0;
+                      final musclePercent = pie?.skeletalMusclePercent ?? 0;
+                      final bonePercent = pie?.remainingPercent ?? 0;
+
+                      return asyncLine.when(
+                        loading: () => const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                        error: (_, __) => Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Text(
+                            'Không tải được lịch sử InBody.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ),
+                        data: (lineResp) {
+                          final list =
+                              lineResp.data
+                                  .map(
+                                    (p) => InbodyRecord(
+                                      checkpointNumber: p.checkpointNumber,
+                                      measuredAt: p.measuredAt,
+                                      weight: p.weightKg.toDouble(),
+                                      smm: p.skeletalMuscleMass / 1000.0,
+                                      pbf: p.fatPercent.toDouble(),
+                                    ),
+                                  )
+                                  .toList()
+                                ..sort(
+                                  (a, b) => a.checkpointNumber.compareTo(
+                                    b.checkpointNumber,
                                   ),
-                                )
-                                .toList()
-                              ..sort(
-                                (a, b) => a.checkpointNumber.compareTo(
-                                  b.checkpointNumber,
-                                ),
-                              );
+                                );
 
-                        return ProgressOverviewCard(
-                          lastUpdated: list.isNotEmpty
-                              ? (list.last.measuredAt ?? DateTime.now())
-                              : DateTime.now(),
-                          currentWeightKg: list.isNotEmpty
-                              ? list.last.weight
-                              : 0.0,
-                          fatPercent: fatPercent,
-                          musclePercent: musclePercent,
-                          bonePercent: bonePercent,
-                          inbodyHistory: list,
-                        );
-                      },
-                    );
-                  },
+                          return ProgressOverviewCard(
+                            lastUpdated: list.isNotEmpty
+                                ? (list.last.measuredAt ?? DateTime.now())
+                                : DateTime.now(),
+                            currentWeightKg: list.isNotEmpty
+                                ? list.last.weight
+                                : 0.0,
+                            fatPercent: fatPercent,
+                            musclePercent: musclePercent,
+                            bonePercent: bonePercent,
+                            inbodyHistory: list,
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
 
-              SliverToBoxAdapter(
-                child: CaloCount(
-                  goal: 2500,
-                  consumed: 2000,
-                  size: 88,
-                  thickness: 9,
+                SliverToBoxAdapter(
+                  child: CaloCount(
+                    goal: 2500,
+                    consumed: 2000,
+                    size: 88,
+                    thickness: 9,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

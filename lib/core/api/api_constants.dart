@@ -31,6 +31,7 @@ class ApiConstants {
   static const String changePassword = '/auth/change-password';
   static const String fullProfile = '/user/full-profile';
   static const String currentUser = '/user/me';
+  static const String goal = '/user/goal';
 
   static const String contentType = 'application/json';
   static const String authorization = 'Authorization';
@@ -75,6 +76,7 @@ class ApiConstants {
   static const prepareNextCheckpoint = "/aihealthplan/prepare-next-checkpoint";
   static const nextTarget = "/checkpoints/next-target";
   static const generateMealPlanWithTarget = "/mealplan/generate-with-target";
+  static const suggestGoal = "/checkpoints/suggest-goal";
 
   //checkout
   static const String paymentCreate = '/payment/create';

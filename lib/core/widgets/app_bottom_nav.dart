@@ -101,7 +101,6 @@ class _BottomNavBar extends StatelessWidget {
       selectedIndex: idx,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
       onDestinationSelected: (i) {
-        // goBranch sẽ tự cập nhật currentIndex
         navigationShell.goBranch(i, initialLocation: false);
       },
       destinations: [

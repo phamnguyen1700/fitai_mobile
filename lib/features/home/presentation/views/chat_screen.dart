@@ -37,13 +37,18 @@ class HomeHostScreen extends ConsumerWidget {
     final tierType = ref.watch(currentTierTypeProvider);
     final tier = tierType?.toUpperCase();
 
-    // FREE (hoặc chưa có sub) → chỉ hiện teaser bán gói
+    // FREE (hoặc chưa có sub) → render như cũ: teaser + plan demo
     if (tier == null || tier == 'FREE') {
       return const _FreePlanTeaser();
     }
 
-    // Premium / VIP / bất cứ gì khác FREE → cho vào chat list
-    return const _ProPlanHost();
+    // PREMIUM & VIP → được dùng message list (multi-conversation)
+    if (tier == 'PREMIUM' || tier == 'VIP') {
+      return const _ProPlanHost();
+    }
+
+    // Các tier khác (nếu backend có thêm) → tạm thời xử lý như FREE
+    return const _FreePlanTeaser();
   }
 }
 
@@ -124,6 +129,22 @@ class _FreePlanTeaser extends ConsumerWidget {
   }
 }
 
+class _ChatListItem {
+  final String? threadId;
+  final String title;
+  final String subtitle;
+  final String type;
+
+  const _ChatListItem({
+    required this.threadId,
+    required this.title,
+    required this.subtitle,
+    required this.type,
+  });
+
+  bool get isFitness => type.toLowerCase() == 'fitness';
+}
+
 class _ProPlanHost extends ConsumerStatefulWidget {
   const _ProPlanHost();
 
@@ -134,17 +155,19 @@ class _ProPlanHost extends ConsumerStatefulWidget {
 class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
   String? _selectedConversationId;
 
+  /// id của thread fitness (nếu đã tạo hoặc backend trả về)
+  String? _fitnessThreadId;
+
   /// Lưu welcome message AI của thread vừa tạo
   final Map<String, String> _initialAiMessages = {};
 
-  /// Đảm bảo chỉ auto-tạo thread đầu tiên 1 lần
-  bool _autoCreatedFirstThread = false;
+  bool _creatingFitness = false;
 
-  Future<void> _createNewConversation() async {
+  /// Tạo thread SUPPORT khi user bấm "Bắt đầu đoạn chat mới"
+  Future<void> _createNewSupportConversation() async {
     try {
-      // Gọi API tạo thread mới
       final data = await ref.read(
-        createChatThreadProvider(title: '', threadType: 'fitness').future,
+        createChatThreadProvider(title: '', threadType: 'support').future,
       );
 
       setState(() {
@@ -152,13 +175,52 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
         _initialAiMessages[data.threadId] = data.aiMessage;
       });
 
-      // Invalidate list để khi back ra list sẽ có thread mới
       ref.invalidate(chatThreadsProvider);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Không tạo được cuộc trò chuyện mới')),
       );
+    }
+  }
+
+  /// Mở chat fitness (nếu chưa có thread thì tạo mới)
+  Future<void> _openFitnessChat() async {
+    // Đã có id thread fitness rồi -> mở luôn
+    if (_fitnessThreadId != null) {
+      setState(() {
+        _selectedConversationId = _fitnessThreadId;
+      });
+      return;
+    }
+
+    if (_creatingFitness) return;
+
+    setState(() => _creatingFitness = true);
+
+    try {
+      final data = await ref.read(
+        createChatThreadProvider(title: '', threadType: 'fitness').future,
+      );
+
+      _fitnessThreadId = data.threadId;
+      _initialAiMessages[data.threadId] = data.aiMessage;
+
+      setState(() {
+        _selectedConversationId = data.threadId;
+      });
+
+      // để lần sau load list thì thread fitness cũng có trong data
+      ref.invalidate(chatThreadsProvider);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tạo được đoạn chat fitness')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _creatingFitness = false);
+      }
     }
   }
 
@@ -174,22 +236,50 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
         child: Text('Không tải được danh sách chat: $err'),
       ),
       data: (conversations) {
-        // Không có thread nào → tự tạo 1 cuộc trò chuyện đầu tiên cho người dùng
-        if (conversations.isEmpty && _selectedConversationId == null) {
-          if (!_autoCreatedFirstThread) {
-            // Gọi sau frame hiện tại để tránh setState trong build nhiều lần
-            _autoCreatedFirstThread = true;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _createNewConversation();
-              }
-            });
-          }
+        // Tách thread fitness (nếu backend có) và các thread còn lại (support)
+        final fitnessThreads = conversations
+            .where((t) => t.threadType.toLowerCase() == 'fitness')
+            .toList();
+        final supportThreads = conversations
+            .where((t) => t.threadType.toLowerCase() != 'fitness')
+            .toList();
 
-          return const Center(child: CircularProgressIndicator());
+        // Nếu backend đã có thread fitness thì lưu id lại
+        if (fitnessThreads.isNotEmpty && _fitnessThreadId == null) {
+          _fitnessThreadId = fitnessThreads.first.id;
         }
 
-        // Nếu chưa chọn → show LIST
+        // ====== GHÉP MẢNG HIỂN THỊ: [fitness pinned] + [support từ API] ======
+        final List<_ChatListItem> items = [];
+
+        // item fitness (luôn có, kể cả khi chưa có thread trên server)
+        items.add(
+          _ChatListItem(
+            threadId: _fitnessThreadId, // có thể null
+            type: 'fitness',
+            title: 'FitAI – Health Plan',
+            subtitle: 'Chat để tạo kế hoạch tập luyện & dinh dưỡng',
+          ),
+        );
+
+        // các thread support từ API
+        for (final c in supportThreads) {
+          final subtitle =
+              c.lastMessageAt != null && c.lastMessageAt!.isNotEmpty
+              ? 'Cập nhật gần nhất: ${c.lastMessageAt}'
+              : 'Loại: ${c.threadType}';
+
+          items.add(
+            _ChatListItem(
+              threadId: c.id,
+              type: c.threadType,
+              title: c.title,
+              subtitle: subtitle,
+            ),
+          );
+        }
+
+        // ===== CHƯA CHỌN CONVERSATION -> SHOW MESSAGE LIST =====
         if (_selectedConversationId == null) {
           return Padding(
             padding: const EdgeInsets.all(12),
@@ -204,13 +294,15 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
                     ),
                     padding: const EdgeInsets.all(12),
                     child: _ConversationList(
-                      conversations: conversations,
-                      onSelect: (id) {
+                      items: items,
+                      onSelectSupport: (threadId) {
                         setState(() {
-                          _selectedConversationId = id;
+                          _selectedConversationId = threadId;
                         });
                       },
-                      onNewChat: _createNewConversation,
+                      onOpenFitness: _openFitnessChat,
+                      onNewSupportChat: _createNewSupportConversation,
+                      isCreatingFitness: _creatingFitness,
                     ),
                   ),
                 ),
@@ -221,7 +313,7 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
           );
         }
 
-        // Đã chọn → tìm thread tương ứng (có thể chưa có trong list nếu vừa tạo)
+        // ===== ĐÃ CHỌN 1 CONVERSATION -> VÀO MÀN CHAT =====
         final selectedId = _selectedConversationId!;
         ChatThread? selected;
         try {
@@ -250,28 +342,33 @@ class _ProPlanHostState extends ConsumerState<_ProPlanHost> {
 class _ConversationList extends StatelessWidget {
   const _ConversationList({
     super.key,
-    required this.conversations,
-    required this.onSelect,
-    required this.onNewChat,
+    required this.items,
+    required this.onSelectSupport,
+    required this.onOpenFitness,
+    required this.onNewSupportChat,
+    this.isCreatingFitness = false,
   });
 
-  final List<ChatThread> conversations;
-  final ValueChanged<String> onSelect;
-  final VoidCallback onNewChat;
+  final List<_ChatListItem> items;
+  final ValueChanged<String> onSelectSupport;
+  final VoidCallback onOpenFitness;
+  final VoidCallback onNewSupportChat;
+  final bool isCreatingFitness;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
-    final totalItems = conversations.length + 1; // +1 cho ô "chat mới"
+    // +1 cho ô "chat mới" (support)
+    final totalItems = items.length + 1;
 
     return ListView.separated(
       itemCount: totalItems,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
-        // Ô cuối: tạo chat mới
-        if (index == conversations.length) {
+        // Ô cuối: tạo chat SUPPORT mới
+        if (index == items.length) {
           return ListTile(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -287,36 +384,57 @@ class _ConversationList extends StatelessWidget {
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
-              'Nhấn để tạo cuộc trò chuyện với AI Coach',
+              'Nhấn để tạo cuộc trò chuyện với AI Coach (support)',
               style: t.bodySmall,
             ),
-            onTap: onNewChat,
+            onTap: onNewSupportChat,
           );
         }
 
-        final c = conversations[index];
+        final item = items[index];
 
-        // Subtitle tạm: loại thread hoặc thời gian tin nhắn cuối
-        final subtitle = c.lastMessageAt != null && c.lastMessageAt!.isNotEmpty
-            ? 'Cập nhật gần nhất: ${c.lastMessageAt}'
-            : 'Loại: ${c.threadType}';
+        final isFitness = item.isFitness;
+        final isDisabledFitness = isFitness && isCreatingFitness;
 
         return ListTile(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: cs.outlineVariant),
+            side: BorderSide(color: isFitness ? cs.primary : cs.outlineVariant),
           ),
-          tileColor: cs.surfaceContainerLowest,
+          tileColor: isFitness
+              ? cs.primaryContainer.withOpacity(0.1)
+              : cs.surfaceContainerLowest,
           leading: CircleAvatar(
-            backgroundColor: cs.primary,
-            child: Icon(Icons.chat_bubble_outline, color: cs.onPrimary),
+            backgroundColor: isFitness ? cs.primary : cs.primaryContainer,
+            child: Icon(
+              isFitness
+                  ? Icons.fitness_center_rounded
+                  : Icons.chat_bubble_outline,
+              color: cs.onPrimary,
+            ),
           ),
           title: Text(
-            c.title,
+            item.title,
             style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
-          subtitle: Text(subtitle, style: t.bodySmall),
-          onTap: () => onSelect(c.id),
+          subtitle: Text(item.subtitle, style: t.bodySmall),
+          onTap: () {
+            if (isFitness) {
+              onOpenFitness();
+            } else if (item.threadId != null) {
+              onSelectSupport(item.threadId!);
+            }
+          },
+          trailing: isDisabledFitness
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: cs.primary,
+                  ),
+                )
+              : null,
         );
       },
     );
@@ -734,49 +852,59 @@ class _ChatMessageList extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final t = Theme.of(context).textTheme;
 
-    final baseCount = messages.length;
-    final total = baseCount + (showPlanCta ? 1 : 0) + (isTyping ? 1 : 0);
+    // Chọn text cho dòng mô tả CTA
+    String _buildCtaLine() {
+      if (isGeneratingWorkout && !workoutDone) {
+        return 'Đang tạo lịch tập cho bạn...';
+      } else if (workoutDone && isGeneratingMeal && !mealDone) {
+        return 'Đang tạo thực đơn cho bạn...';
+      } else if (workoutDone && mealDone) {
+        return 'Plan cá nhân hóa của bạn đã sẵn sàng';
+      } else {
+        return 'Mình đã sẵn sàng làm plan cá nhân hóa cho bạn';
+      }
+    }
 
-    return ListView.builder(
-      controller: controller,
-      padding: const EdgeInsets.only(bottom: 8),
-      itemCount: total,
-      itemBuilder: (context, index) {
-        // 1) Các bubble chat bình thường
-        if (index < baseCount) {
-          final m = messages[index];
-          return Align(
-            alignment: m.isMe ? Alignment.centerRight : Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: AppChatBubble(
-                text: m.text,
-                isMe: m.isMe,
-                botAvatar: 'lib/core/assets/images/chatbot.png',
-              ),
-            ),
-          );
-        }
+    final bool isAnyGenerating =
+        (isGeneratingWorkout && !workoutDone) ||
+        (isGeneratingMeal && !mealDone);
 
-        // 2) Plan CTA + progress
-        if (showPlanCta && index == baseCount) {
-          // chọn text cho dòng mô tả
-          String line;
-          if (isGeneratingWorkout && !workoutDone) {
-            line = 'Đang tạo lịch tập cho bạn...';
-          } else if (workoutDone && isGeneratingMeal && !mealDone) {
-            line = 'Đang tạo thực đơn cho bạn...';
-          } else if (workoutDone && mealDone) {
-            line = 'Plan cá nhân hóa của bạn đã sẵn sàng';
-          } else {
-            line = 'Mình đã sẵn sàng làm plan cá nhân hóa cho bạn';
-          }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ===== LIST MESSAGES (như cũ) =====
+        Expanded(
+          child: ListView.builder(
+            controller: controller,
+            padding: const EdgeInsets.only(bottom: 8),
+            itemCount: messages.length,
+            itemBuilder: (context, index) {
+              final m = messages[index];
+              return Align(
+                alignment: m.isMe
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 2,
+                  ),
+                  child: AppChatBubble(
+                    text: m.text,
+                    isMe: m.isMe,
+                    botAvatar: 'lib/core/assets/images/chatbot.png',
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
 
-          final bool isAnyGenerating =
-              (isGeneratingWorkout && !workoutDone) ||
-              (isGeneratingMeal && !mealDone);
+        const SizedBox(height: 4),
 
-          return Padding(
+        // ===== CTA “Nhận plan” + progress, nằm dưới list =====
+        if (showPlanCta)
+          Padding(
             padding: const EdgeInsets.only(
               top: 6,
               left: 25,
@@ -797,14 +925,14 @@ class _ChatMessageList extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          line,
+                          _buildCtaLine(),
                           style: t.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 4),
 
-                        // ===== Chỉ hiện 1 thanh tại 1 thời điểm =====
+                        // Chỉ hiển thị 1 thanh progress tại 1 thời điểm
                         if (isGeneratingWorkout && !workoutDone)
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -832,7 +960,7 @@ class _ChatMessageList extends StatelessWidget {
                             ],
                           )
                         else
-                          // Khi KHÔNG còn generate gì → show CTA
+                          // Khi không còn generate gì → show CTA
                           GestureDetector(
                             onTap: onGetPlan,
                             child: Text(
@@ -850,12 +978,11 @@ class _ChatMessageList extends StatelessWidget {
                 ),
               ],
             ),
-          );
-        }
+          ),
 
-        // 3) Typing indicator
-        if (isTyping && index == total - 1) {
-          return Align(
+        // ===== Typing indicator (nằm cuối, dưới CTA) =====
+        if (isTyping)
+          Align(
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
@@ -869,11 +996,8 @@ class _ChatMessageList extends StatelessWidget {
                 ),
               ),
             ),
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
+          ),
+      ],
     );
   }
 }

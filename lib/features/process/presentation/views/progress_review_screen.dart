@@ -17,6 +17,9 @@ import 'package:fitai_mobile/features/daily/presentation/viewmodels/process_prov
 // Provider cho AI health plan (prepare next checkpoint, next target, generate meal)
 import 'package:fitai_mobile/features/process/presentation/viewmodels/ai_healthplan_providers.dart';
 import 'package:fitai_mobile/features/process/presentation/viewmodels/achievement_providers.dart';
+import 'package:fitai_mobile/features/process/presentation/viewmodels/suggest_goal_providers.dart';
+import 'package:fitai_mobile/features/process/presentation/viewmodels/user_goal_providers.dart';
+import 'package:fitai_mobile/core/widgets/widgets.dart';
 
 class ProgressReviewBody extends ConsumerStatefulWidget {
   final List<InbodyRecord> history;
@@ -49,11 +52,90 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
     }
   }
 
+  Future<bool> _handleSuggestGoalIfNeeded() async {
+    try {
+      final repo = ref.read(suggestGoalRepositoryProvider);
+      final resp = await repo.getSuggestedGoal();
+      final data = resp.data;
+
+      // Nếu API fail hoặc không yêu cầu đổi thì bỏ qua
+      if (!resp.success || !data.needToChangePlan) {
+        return false;
+      }
+
+      final bool? accepted = await showModalBottomSheet<bool>(
+        context: context,
+        useRootNavigator: true,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
+          final media = MediaQuery.of(ctx);
+          final cs = Theme.of(ctx).colorScheme;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              top: media.viewPadding.top,
+              bottom: media.viewInsets.bottom,
+            ),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: Material(
+                  // 👇 trắng ở light, đen ở dark
+                  color: cs.brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  child: _SuggestGoalSheet(
+                    goalNameVi: data.goalNameVi,
+                    goalName: data.goalName,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      if (accepted == true) {
+        // user đồng ý đổi mục tiêu
+        final userGoalRepo = ref.read(userGoalRepositoryProvider);
+        final ok = await userGoalRepo.updateUserGoal(data.goalName);
+
+        debugPrint(
+          '[SuggestGoal] Accepted new goal ${data.goalName} / ${data.goalNameVi}, '
+          'updateUserGoal success = $ok',
+        );
+
+        // Sau khi đổi goal xong: dừng flow generate
+        return true;
+      }
+
+      // user không đổi mục tiêu → tiếp tục generate plan
+      return false;
+    } catch (e) {
+      debugPrint('[SuggestGoal] Error when calling suggest-goal: $e');
+      // lỗi thì coi như không đổi mục tiêu, cho tiếp tục generate
+      return false;
+    }
+  }
+
   Future<void> _handleGeneratePlan() async {
     if (_isGenerating) return;
-
     final messenger = ScaffoldMessenger.of(context);
 
+    // BƯỚC 0: gọi suggest-goal trước
+    final bool goalChanged = await _handleSuggestGoalIfNeeded();
+    if (goalChanged) {
+      // User đã chọn ĐỔI mục tiêu (mới chỉ debugPrint),
+      // không generate kế hoạch tuần mới nữa.
+      return;
+    }
+
+    // Nếu không đổi mục tiêu → chạy flow cũ
     setState(() {
       _isGenerating = true;
       _progress = 0;
@@ -491,5 +573,84 @@ class _ProgressReviewBodyState extends ConsumerState<ProgressReviewBody> {
     if (diff < 0) return "PBF đang giảm nhẹ → tiếp tục duy trì!";
     if (diff.abs() < 1) return "PBF giữ ổn định → khá tốt!";
     return "PBF tăng → cần xem lại dinh dưỡng và tập luyện.";
+  }
+}
+
+class _SuggestGoalSheet extends StatelessWidget {
+  final String goalNameVi;
+  final String goalName;
+
+  const _SuggestGoalSheet({required this.goalNameVi, required this.goalName});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final tt = theme.textTheme;
+
+    return SafeArea(
+      child: Padding(
+        // giống Auth sheet: fromLTRB(20, 12, 20, 32)
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Text(
+                'Đề xuất thay đổi mục tiêu',
+                style: tt.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "Theo phân tích của AI, bạn nên đổi mục tiêu tập luyện thành:",
+              style: tt.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              goalNameVi,
+              style: tt.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.primary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "($goalName)",
+              style: tt.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 24),
+
+            // 2 nút đồng bộ style với Auth (AppButton)
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    label: 'Giữ mục tiêu hiện tại',
+                    variant: AppButtonVariant.outlined,
+                    fullWidth: true,
+                    onPressed: () {
+                      Navigator.of(context).pop(false);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    label: 'Đổi mục tiêu',
+                    variant: AppButtonVariant.filled,
+                    fullWidth: true,
+                    onPressed: () {
+                      Navigator.of(context).pop(true);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
