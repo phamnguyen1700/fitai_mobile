@@ -20,6 +20,7 @@ class TodayMealPlan extends ConsumerStatefulWidget {
     this.onReload,
     this.onboardingStep,
     this.waitingReviewMessage,
+    this.tierType,
   });
 
   final MealDayData day;
@@ -28,6 +29,7 @@ class TodayMealPlan extends ConsumerStatefulWidget {
   final VoidCallback? onReload;
   final String? onboardingStep;
   final String? waitingReviewMessage;
+  final String? tierType;
 
   @override
   ConsumerState<TodayMealPlan> createState() => _TodayMealPlanState();
@@ -45,7 +47,7 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
   List<MealEntry> _meals = const [];
 
   final _mealPhotoRepo = MealPhotoRepository();
-  bool _isUploading = false;
+  String? _uploadingMealType;
 
   @override
   void initState() {
@@ -89,9 +91,9 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
     super.dispose();
   }
 
-  /// Upload ảnh + mark completed
   Future<void> _handleUploadPhoto(MealEntry entry) async {
-    if (_isUploading) return;
+    // đang upload bữa khác thì bỏ qua để tránh spam
+    if (_uploadingMealType != null) return;
 
     final picker = ImagePicker();
     final picked = await picker.pickImage(
@@ -101,17 +103,17 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
 
     if (picked == null) return;
 
-    setState(() => _isUploading = true);
+    setState(() {
+      _uploadingMealType = entry.meal.type; // đánh dấu đúng bữa đang upload
+    });
 
     try {
       final file = File(picked.path);
-
       final res = await _mealPhotoRepo.uploadAndComplete(
         dayNumber: widget.day.dayNumber,
         mealType: entry.meal.type,
         photoFile: file,
       );
-
       debugPrint(
         '[TodayMealPlan] upload result: ${res.success} - ${res.message}',
       );
@@ -154,14 +156,16 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isUploading = false);
-      }
+      setState(() {
+        _uploadingMealType = null;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('[TodayMealPlan] tierType = ${widget.tierType}');
+
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
@@ -215,6 +219,10 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
         widget.waitingReviewMessage ??
         'Kế hoạch của bạn đang chờ advisor duyệt. Vui lòng đợi trong giây lát.';
 
+    // 🔑 Logic tier: chỉ VIP mới có phần nhận xét
+    final tier = widget.tierType?.toUpperCase();
+    final bool showMealComments = tier == 'VIP';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: OnboardingGate(
@@ -222,117 +230,109 @@ class _TodayMealPlanState extends ConsumerState<TodayMealPlan> {
         shouldLock: (step) => step == 'waitingreview',
         lockTitle: 'Đang chờ advisor duyệt',
         lockMessage: waitingMessage,
-        child: Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: cs.outlineVariant),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Thực đơn hôm nay',
-                    style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  _DailySummaryCard(day: widget.day),
-                  const SizedBox(height: 4),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: cs.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Thực đơn hôm nay',
+                      style: t.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    _DailySummaryCard(day: widget.day),
+                    const SizedBox(height: 4),
 
-                  // Đo size thật giống workout — đo cả card + ảnh + comment
-                  Offstage(
-                    offstage: true,
-                    child: Column(
-                      children: [
-                        for (int i = 0; i < meals.length; i++)
-                          _MeasureSize(
-                            key: ValueKey('meal-${i}-${meals[i].meal.type}'),
-                            onChange: (size) => _onMealSize(i, size),
-                            child: _MealPage(
-                              entry: meals[i],
-                              onUploadPhoto: _handleUploadPhoto,
+                    // Đo size thật giống workout — đo cả card + ảnh + comment
+                    Offstage(
+                      offstage: true,
+                      child: Column(
+                        children: [
+                          for (int i = 0; i < meals.length; i++)
+                            _MeasureSize(
+                              key: ValueKey('meal-${i}-${meals[i].meal.type}'),
+                              onChange: (size) => _onMealSize(i, size),
+                              child: _MealPage(
+                                entry: meals[i],
+                                onUploadPhoto: _handleUploadPhoto,
+                                showComments: showMealComments,
+                                isUploading:
+                                    _uploadingMealType == meals[i].meal.type,
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Card meal swipe (card + ảnh + comment swipe chung)
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    height: targetHeight,
-                    child: PageView.builder(
-                      controller: _pageController,
-                      itemCount: meals.length,
-                      onPageChanged: (index) {
-                        setState(() => _currentIndex = index);
-                      },
-                      itemBuilder: (context, index) {
-                        final entry = meals[index];
-                        return _MealPage(
-                          entry: entry,
-                          onUploadPhoto: _handleUploadPhoto,
-                        );
-                      },
+                    // Card meal swipe (card + ảnh + comment swipe chung)
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      height: targetHeight,
+                      child: PageView.builder(
+                        controller: _pageController,
+                        itemCount: meals.length,
+                        onPageChanged: (index) {
+                          setState(() => _currentIndex = index);
+                        },
+                        itemBuilder: (context, index) {
+                          final entry = meals[index];
+                          return _MealPage(
+                            entry: entry,
+                            onUploadPhoto: _handleUploadPhoto,
+                            showComments: showMealComments,
+                            isUploading: _uploadingMealType == entry.meal.type,
+                          );
+                        },
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
 
-                  /// Dots indicator
-                  Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: List.generate(
-                        meals.length,
-                        (i) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(horizontal: 4),
-                          width: _currentIndex == i ? 12 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: _currentIndex == i
-                                ? cs.primary
-                                : cs.onSurfaceVariant.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(6),
+                    /// Dots indicator
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: List.generate(
+                          meals.length,
+                          (i) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 250),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: _currentIndex == i ? 12 : 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: _currentIndex == i
+                                  ? cs.primary
+                                  : cs.onSurfaceVariant.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (_isUploading)
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: cs.surface.withOpacity(0.65),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(color: cs.primary),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Đang tải ảnh...',
-                          style: t.bodyMedium?.copyWith(
-                            color: cs.onSurface,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  ],
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -445,14 +445,18 @@ class _DailySummaryCard extends StatelessWidget {
   }
 }
 
-/// Card từng bữa ăn
 class _MealTodoCard extends StatelessWidget {
-  const _MealTodoCard({required this.entry, this.onUploadPhoto});
+  const _MealTodoCard({
+    required this.entry,
+    this.onUploadPhoto,
+    this.isUploading = false,
+  });
 
   static const double kPhotoHeight = 200;
 
   final MealEntry entry;
   final Future<void> Function(MealEntry entry)? onUploadPhoto;
+  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
@@ -547,27 +551,45 @@ class _MealTodoCard extends StatelessWidget {
           _MealFoodsTable(foods: meal.foods),
           const SizedBox(height: 12),
 
-          /// Upload photo
           if (photoUrl == null || photoUrl.isEmpty)
             Align(
               alignment: Alignment.bottomRight,
-              child: TextButton.icon(
-                onPressed: () async {
-                  if (onUploadPhoto != null) await onUploadPhoto!(entry);
-                },
-                icon: Icon(
-                  Icons.photo_camera_outlined,
-                  size: 18,
-                  color: cs.primary,
-                ),
-                label: Text(
-                  'Tải ảnh bữa ăn',
-                  style: t.bodySmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
+              child: isUploading
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.6,
+                            color: cs.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Đang tải ảnh bữa ăn...',
+                          style: t.bodySmall?.copyWith(color: cs.primary),
+                        ),
+                      ],
+                    )
+                  : TextButton.icon(
+                      onPressed: () async {
+                        if (onUploadPhoto != null) await onUploadPhoto!(entry);
+                      },
+                      icon: Icon(
+                        Icons.photo_camera_outlined,
+                        size: 18,
+                        color: cs.primary,
+                      ),
+                      label: Text(
+                        'Tải ảnh bữa ăn',
+                        style: t.bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
             ),
         ],
       ),
@@ -575,12 +597,18 @@ class _MealTodoCard extends StatelessWidget {
   }
 }
 
-/// Một trang meal: card + ảnh + comment, dùng cho cả PageView & đo size
 class _MealPage extends StatelessWidget {
-  const _MealPage({required this.entry, required this.onUploadPhoto});
+  const _MealPage({
+    required this.entry,
+    required this.onUploadPhoto,
+    required this.showComments,
+    this.isUploading = false,
+  });
 
   final MealEntry entry;
   final Future<void> Function(MealEntry entry) onUploadPhoto;
+  final bool showComments;
+  final bool isUploading;
 
   @override
   Widget build(BuildContext context) {
@@ -590,7 +618,11 @@ class _MealPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _MealTodoCard(entry: entry, onUploadPhoto: onUploadPhoto),
+        _MealTodoCard(
+          entry: entry,
+          onUploadPhoto: onUploadPhoto,
+          isUploading: isUploading,
+        ),
         if (hasPhoto) ...[
           const SizedBox(height: 8),
           ClipRRect(
@@ -603,7 +635,8 @@ class _MealPage extends StatelessWidget {
             ),
           ),
         ],
-        if (hasComment) ...[
+        if (hasComment && showComments) ...[
+          // ⭐ chỉ VIP mới vào đây
           const SizedBox(height: 8),
           _MealPhotoCommentsSection(mealLogId: entry.mealLogId!),
         ],

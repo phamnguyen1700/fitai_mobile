@@ -150,7 +150,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         .login(email: email, password: password, rememberMe: _rememberMe);
 
     final asyncAuth = ref.read(authNotifierProvider);
-    final authState = asyncAuth.value; // AuthState? hoặc null
+    final authState = asyncAuth.value;
 
     if (!mounted) return;
 

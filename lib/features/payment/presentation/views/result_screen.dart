@@ -444,7 +444,6 @@ class _PaymentResultScreenState extends ConsumerState<PaymentResultScreen> {
     );
   }
 
-  /// ================== UI: màn quét body (đè lên) ==================
   Widget _buildBodyScanSection(BuildContext context, UserModel? user) {
     if (user == null || user.height == null || user.weight == null) {
       return Column(

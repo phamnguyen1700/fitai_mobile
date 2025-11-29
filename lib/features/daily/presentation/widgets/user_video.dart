@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:fitai_mobile/core/widgets/network_thumb_video.dart';
 
@@ -85,6 +86,7 @@ class _UserExerciseVideoSectionState extends State<UserExerciseVideoSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ====== HEADER: "Video bài tập của bạn" + % / check ======
         Row(
           children: [
             Expanded(
@@ -117,51 +119,77 @@ class _UserExerciseVideoSectionState extends State<UserExerciseVideoSection> {
         ),
         const SizedBox(height: 6),
 
-        // ===== VIDEO PREVIEW =====
+        // ====== VIDEO PREVIEW (style giống video chính) ======
         GestureDetector(
           onTap: () => _openFullScreen(context),
           child: AspectRatio(
             aspectRatio: 16 / 9,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                NetworkVideoThumbnail(videoUrl: src),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black54],
-                    ),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const Center(
-                  child: Icon(Icons.play_arrow, size: 40, color: Colors.white),
-                ),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      'Video của bạn',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Nền: thumbnail hoặc placeholder
+                  if (_isLocal)
+                    // Local video: dùng nền tối + icon (tránh dùng NetworkVideoThumbnail)
+                    Container(
+                      color: cs.surfaceVariant,
+                      child: const Center(
+                        child: Icon(
+                          Icons.videocam,
+                          color: Colors.white70,
+                          size: 40,
+                        ),
+                      ),
+                    )
+                  else
+                    NetworkVideoThumbnail(videoUrl: src),
+
+                  // Overlay gradient cho giống video chính
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, Colors.black54],
                       ),
                     ),
                   ),
-                ),
-              ],
+
+                  // Icon play ở giữa
+                  const Center(
+                    child: Icon(
+                      Icons.play_arrow,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+
+                  // Badge "Video của bạn" góc trên trái
+                  Positioned(
+                    left: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Video của bạn',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -185,6 +213,34 @@ class _UserVideoFullScreenPage extends StatefulWidget {
 }
 
 class _UserVideoFullScreenPageState extends State<_UserVideoFullScreenPage> {
+  @override
+  void initState() {
+    super.initState();
+    _enterFullscreen();
+  }
+
+  Future<void> _enterFullscreen() async {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+  }
+
+  Future<void> _exitFullscreen() async {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  }
+
+  @override
+  void dispose() {
+    _exitFullscreen();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;

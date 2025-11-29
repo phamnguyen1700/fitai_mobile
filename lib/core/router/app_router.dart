@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:fitai_mobile/features/daily/presentation/viewmodels/meal_plan_providers.dart';
+import 'package:fitai_mobile/features/daily/presentation/viewmodels/workout_plan_providers.dart';
+import 'package:fitai_mobile/features/daily/presentation/viewmodels/process_providers.dart';
+import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
+
 import '../widgets/app_scaffold.dart';
 import '../widgets/app_bar.dart';
 import '../widgets/user_header_appbar.dart';
@@ -53,6 +58,7 @@ class RouteLogger extends NavigatorObserver {
 }
 
 final isLoggedInProvider = StateProvider<bool>((_) => false);
+final currentTabIndexProvider = StateProvider<int>((_) => 0);
 final _rootKey = GlobalKey<NavigatorState>();
 
 final goRouterProvider = Provider<GoRouter>((ref) {
