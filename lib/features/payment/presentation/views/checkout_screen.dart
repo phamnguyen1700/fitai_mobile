@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-
 import 'package:fitai_mobile/features/auth/presentation/viewmodels/auth_providers.dart';
 import 'package:fitai_mobile/features/payment/presentation/viewmodels/payment_controller.dart';
 
@@ -74,8 +73,6 @@ class CheckoutScreen extends ConsumerWidget {
     return AppScaffold(
       showLegalFooter: true,
       appBar: const AppAppBar(title: 'Thanh toán'),
-      // Nếu AppAppBar có hỗ trợ onBack, bạn có thể dùng:
-      // appBar: AppAppBar(title: 'Thanh toán', onBack: onBack),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -225,8 +222,9 @@ class CheckoutScreen extends ConsumerWidget {
                                   '[Checkout] Creating payment for plan: ${plan.name}',
                                 );
 
+                                // 🔥 TRUYỀN USER VÀO ĐÂY
                                 final resp = await controller
-                                    .createPaymentSession(plan);
+                                    .createPaymentSession(plan, user);
 
                                 if (resp == null) {
                                   messenger.showSnackBar(

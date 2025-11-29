@@ -23,6 +23,7 @@ class ApiConstants {
   static const String bodygramUpload = '/bodygram/upload-body-images';
   static const String bodygramAnalyze = '/bodygram/analyze-body-images';
   static const String dietaryPreference = '/dietarypreference';
+  static const String latestBodyData = '/bodydata/latest';
 
   // User endpoints
   static const String profile = '/user/profile';

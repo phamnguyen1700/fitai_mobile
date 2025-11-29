@@ -142,8 +142,10 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
-                      onPressed: () =>
-                          ref.refresh(mealPlanGenerateProvider.future),
+                      onPressed: () {
+                        ref.invalidate(mealPlanDailyMealsProvider);
+                      },
+
                       icon: const Icon(Icons.refresh),
                       label: const Text('Thử lại'),
                     ),
@@ -170,7 +172,8 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                 final safeIndex = _selectedIndex.clamp(0, maxIndex);
                 final selectedDay = days[safeIndex];
                 final selectedDate = _dateFromIndex(safeIndex);
-
+                final firstDate = _baseDate; // ngày bắt đầu plan (hôm nay)
+                final lastDate = _baseDate.add(Duration(days: days.length - 1));
                 return Column(
                   children: [
                     const SizedBox(height: 8),
@@ -179,6 +182,8 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                     DailyDateSelector(
                       selectedDate: selectedDate,
                       onChanged: (date) => _onDateChanged(date, days.length),
+                      firstDate: firstDate,
+                      lastDate: lastDate,
                     ),
 
                     const SizedBox(height: 8),
@@ -187,9 +192,10 @@ class _PlanPreviewBodyState extends ConsumerState<PlanPreviewBody> {
                     Expanded(
                       child: RefreshIndicator(
                         onRefresh: () async {
-                          await ref.refresh(mealPlanGenerateProvider.future);
-                          await ref.refresh(workoutPlanGenerateProvider.future);
+                          ref.invalidate(mealPlanDailyMealsProvider);
+                          ref.invalidate(workoutPlanDaysProvider);
                         },
+
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           children: [

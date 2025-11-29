@@ -22,8 +22,11 @@ class DailyScreen extends ConsumerStatefulWidget {
 }
 
 class _DailyScreenState extends ConsumerState<DailyScreen> {
-  DateTime _selected = DateTime.now();
+  late final DateTime _today = DateUtils.dateOnly(DateTime.now());
+  late final DateTime _firstDate = _today.subtract(const Duration(days: 7));
+  late final DateTime _lastDate = _today.add(const Duration(days: 7));
 
+  DateTime _selected = DateUtils.dateOnly(DateTime.now());
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -98,6 +101,8 @@ class _DailyScreenState extends ConsumerState<DailyScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                       child: DailyDateSelector(
                         selectedDate: _selected,
+                        firstDate: _firstDate, // 👈 thêm
+                        lastDate: _lastDate, // 👈 thêm
                         onChanged: (d) {
                           ref.read(currentDayProvider.notifier).set(d.weekday);
                           setState(() => _selected = d);
